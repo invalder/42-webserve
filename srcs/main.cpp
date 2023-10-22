@@ -1,4 +1,5 @@
 #include <iostream>
+#include <config_parser.hpp>
 
 int	main (int argc, char **argv)
 {
@@ -9,12 +10,12 @@ int	main (int argc, char **argv)
 	// with specific conf file
 	else if (argc == 2)
 	{
-		/* code */
+		ConfigParser startingData(argv[1]);
 	}
 	// without conf file, use default
 	else if (argc == 1)
 	{
-		/* code */
+		ConfigParser startingData("default.conf");
 	}
 
 

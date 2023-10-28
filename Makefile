@@ -18,7 +18,7 @@ OBJS = $(SRCS:.cpp=.o)
 
 INCS = -Iincludes/
 
-SRCS = config_parser.cpp \
+SRCS = config_handler.cpp \
 	main.cpp \
 
 DBG = *.dSYM

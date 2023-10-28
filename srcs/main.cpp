@@ -1,4 +1,8 @@
 #include <iostream>
+#include <string>
+#include <vector>
+#include <map>
+#include <fstream>
 #include <config_parser.hpp>
 
 int	main (int argc, char **argv)
@@ -15,7 +19,7 @@ int	main (int argc, char **argv)
 	// without conf file, use default
 	else if (argc == 1)
 	{
-		ConfigParser startingData("default.conf");
+		ConfigParser startingData("webserve.conf");
 	}
 
 

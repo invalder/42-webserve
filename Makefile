@@ -20,6 +20,7 @@ INCS = -Iincludes/
 
 SRCS = config_handler.cpp \
 	main.cpp \
+	server.cpp \
 
 DBG = *.dSYM
 

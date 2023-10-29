@@ -7,6 +7,41 @@
 #include <vector>
 #include <exception>
 
+class Location {
+	public:
+		std::string path;
+		std::map<std::string, std::string> directives;
+
+		// Location();
+		// Location(const Location &);
+		// Location &operator=(const Location &);
+		// ~Location();
+};
+
+class Server {
+	public:
+		int listen_port;
+		std::vector<std::string> server_names;
+		std::map<std::string, std::string> directives;
+		std::vector<Location> locations;
+
+		// Server();
+		// Server(const Server &);
+		// Server &operator=(const Server &);
+		// ~Server();
+};
+
+class HTTPConfig {
+	public:
+		std::map<std::string, std::string> directives;
+		std::vector<Server> servers;
+
+		// HTTPConfig();
+		// HTTPConfig(const HTTPConfig &);
+		// HTTPConfig &operator=(const HTTPConfig &);
+		// ~HTTPConfig();
+};
+
 class ConfigHandler
 {
 	private:
@@ -20,7 +55,8 @@ class ConfigHandler
 		std::map<std::string, std::string> _configMap;
 
 		void			_initializedConfigDataMap( std::ifstream & );
-		std::ifstream	_getFileStream( std::string );
+		// std::ifstream	_getFileStream( std::string );
+		static HTTPConfig 	_parseHTTPConfig(const std::string& filename);
 
 	public:
 		ConfigHandler();

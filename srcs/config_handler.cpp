@@ -17,59 +17,78 @@ static inline std::string& trim(std::string& s) {
 
 void parseHttpDirectives(std::string line, HTTPConfig& httpConfig)
 {
-	size_t startPos = line.find_first_not_of(" \t");
-	if (startPos != std::string::npos) {
-		size_t endPos = line.find(";", startPos);
-		if (endPos != std::string::npos) {
-			std::string directive = line.substr(startPos, endPos - startPos);
-			size_t spacePos = directive.find(" ");
-			if (spacePos != std::string::npos) {
-				std::string key = directive.substr(0, spacePos);
-				std::string value = directive.substr(spacePos + 1);
-				trim(key);
-				trim(value);
-				httpConfig.directives[key] = value;
-			}
-		}
+	// Trim any leading and trailing whitespace from the line
+	trim(line);
+
+	// Check if the line is a valid directive (must contain at least one space and end with a semicolon)
+	size_t semicolonPos = line.rfind(";");
+	if (semicolonPos == std::string::npos || semicolonPos == 0) {
+		// Not a valid directive line
+		return;
+	}
+
+	// Extract the directive (excluding the semicolon)
+	std::string directive = line.substr(0, semicolonPos);
+	trim(directive);
+
+	// Find the space between the key and the value
+	size_t spacePos = directive.find(" ");
+	if (spacePos == std::string::npos) {
+		// No space found, so it's not a key-value pair
+		return;
+	}
+
+	// Extract the key and value
+	std::string key = directive.substr(0, spacePos);
+	std::string value = directive.substr(spacePos + 1);
+
+	// Trim any excess whitespace from the key and value
+	trim(key);
+	trim(value);
+
+	// Store the key-value pair in the directives map
+	if (!key.empty() && !value.empty()) {
+		std::cerr << "Adding directive " << key << " with value " << value << std::endl;
+		httpConfig.directives[key] = value;
 	}
 }
 
 // Helper function to parse server directives
 void parseServerDirectives(std::string line, Server& currentServer) {
-    // Trim any leading and trailing whitespace from the line
-    trim(line);
+	// Trim any leading and trailing whitespace from the line
+	trim(line);
 
-    // Check if the line is a valid directive (must contain at least one space and end with a semicolon)
-    size_t semicolonPos = line.rfind(";");
-    if (semicolonPos == std::string::npos || semicolonPos == 0) {
-        // Not a valid directive line
-        return;
-    }
+	// Check if the line is a valid directive (must contain at least one space and end with a semicolon)
+	size_t semicolonPos = line.rfind(";");
+	if (semicolonPos == std::string::npos || semicolonPos == 0) {
+		// Not a valid directive line
+		return;
+	}
 
-    // Extract the directive (excluding the semicolon)
-    std::string directive = line.substr(0, semicolonPos);
-    trim(directive);
+	// Extract the directive (excluding the semicolon)
+	std::string directive = line.substr(0, semicolonPos);
+	trim(directive);
 
-    // Find the space between the key and the value
-    size_t spacePos = directive.find(" ");
-    if (spacePos == std::string::npos) {
-        // No space found, so it's not a key-value pair
-        return;
-    }
+	// Find the space between the key and the value
+	size_t spacePos = directive.find(" ");
+	if (spacePos == std::string::npos) {
+		// No space found, so it's not a key-value pair
+		return;
+	}
 
-    // Extract the key and value
-    std::string key = directive.substr(0, spacePos);
-    std::string value = directive.substr(spacePos + 1);
+	// Extract the key and value
+	std::string key = directive.substr(0, spacePos);
+	std::string value = directive.substr(spacePos + 1);
 
-    // Trim any excess whitespace from the key and value
-    trim(key);
-    trim(value);
+	// Trim any excess whitespace from the key and value
+	trim(key);
+	trim(value);
 
-    // Store the key-value pair in the directives map
-    if (!key.empty() && !value.empty()) {
+	// Store the key-value pair in the directives map
+	if (!key.empty() && !value.empty()) {
 		std::cerr << "Adding directive " << key << " with value " << value << std::endl;
-        currentServer.directives[key] = value;
-    }
+		currentServer.directives[key] = value;
+	}
 }
 
 // default constructor
@@ -242,12 +261,15 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 
 		if (insideHttp && !insideServer) {
 			// Parse general http directives, for simplicity, let's say each directive is on its own line.
-			size_t spacePos = line.find(" ");
-			if (spacePos != std::string::npos) {
-				std::string key = line.substr(0, spacePos);
-				std::string value = line.substr(spacePos+1, line.find(";") - spacePos - 1);
-				_httpConfig.directives[key] = value;
-			}
+			// size_t spacePos = line.find(" ");
+			// if (spacePos != std::string::npos) {
+			// 	std::string key = line.substr(0, spacePos);
+			// 	std::string value = line.substr(spacePos+1, line.find(";") - spacePos - 1);
+			// 	_httpConfig.directives[key] = value;
+			// }
+			std::cerr << "Parsing http directive" << std::endl;
+			std::cerr << line << std::endl;
+			parseHttpDirectives(line, _httpConfig);
 			continue;
 		}
 
@@ -255,12 +277,7 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 			// Parse server directives similarly. For simplicity, we won't handle location blocks here.
 			std::cerr << "Parsing server directive" << std::endl;
 			std::cerr << line << std::endl;
-			// size_t spacePos = line.find(" ");
-			// if (spacePos != std::string::npos) {
-			// 	std::string key = line.substr(0, spacePos);
-			// 	std::string value = line.substr(spacePos+1, line.find(";") - spacePos - 1);
-			// 	currentServer.directives[key] = value;
-			// }
+
 			parseServerDirectives(line, currentServer);
 			continue;
 		}
@@ -305,6 +322,13 @@ void ConfigHandler::printServerDirectives() const {
 			std::cout << "Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
 		}
 		std::cout << std::endl; // Add a newline for readability between servers
+	}
+}
+
+void ConfigHandler::printHTTPDirectives() const {
+	// Loop over each directive in the configuration
+	for (std::map<std::string, std::string>::const_iterator directiveIt = _httpConfig.directives.begin(); directiveIt != _httpConfig.directives.end(); ++directiveIt) {
+		std::cout << "HTTP Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
 	}
 }
 

@@ -11,6 +11,8 @@ int	main (int argc, char **argv)
 		ConfigHandler configHandler = ConfigHandler( fileName );
 		// configHandler.printData();
 		configHandler.printServerDirectives();
+
+		configHandler.printHTTPDirectives();
 	} else {
 		std::cerr << "Parameters are more than 2" << std::endl;
 	}

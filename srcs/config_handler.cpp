@@ -1,5 +1,77 @@
 #include "config_handler.hpp"
 
+// Helper functions to trim whitespace
+static inline std::string& ltrim(std::string& s) {
+	s.erase(s.begin(), std::find_if(s.begin(), s.end(), not1(std::ptr_fun<int, int>(isspace))));
+	return s;
+}
+
+static inline std::string& rtrim(std::string& s) {
+	s.erase(std::find_if(s.rbegin(), s.rend(), not1(std::ptr_fun<int, int>(isspace))).base(), s.end());
+	return s;
+}
+
+static inline std::string& trim(std::string& s) {
+	return ltrim(rtrim(s));
+}
+
+void parseHttpDirectives(std::string line, HTTPConfig& httpConfig)
+{
+	size_t startPos = line.find_first_not_of(" \t");
+	if (startPos != std::string::npos) {
+		size_t endPos = line.find(";", startPos);
+		if (endPos != std::string::npos) {
+			std::string directive = line.substr(startPos, endPos - startPos);
+			size_t spacePos = directive.find(" ");
+			if (spacePos != std::string::npos) {
+				std::string key = directive.substr(0, spacePos);
+				std::string value = directive.substr(spacePos + 1);
+				trim(key);
+				trim(value);
+				httpConfig.directives[key] = value;
+			}
+		}
+	}
+}
+
+// Helper function to parse server directives
+void parseServerDirectives(std::string line, Server& currentServer) {
+    // Trim any leading and trailing whitespace from the line
+    trim(line);
+
+    // Check if the line is a valid directive (must contain at least one space and end with a semicolon)
+    size_t semicolonPos = line.rfind(";");
+    if (semicolonPos == std::string::npos || semicolonPos == 0) {
+        // Not a valid directive line
+        return;
+    }
+
+    // Extract the directive (excluding the semicolon)
+    std::string directive = line.substr(0, semicolonPos);
+    trim(directive);
+
+    // Find the space between the key and the value
+    size_t spacePos = directive.find(" ");
+    if (spacePos == std::string::npos) {
+        // No space found, so it's not a key-value pair
+        return;
+    }
+
+    // Extract the key and value
+    std::string key = directive.substr(0, spacePos);
+    std::string value = directive.substr(spacePos + 1);
+
+    // Trim any excess whitespace from the key and value
+    trim(key);
+    trim(value);
+
+    // Store the key-value pair in the directives map
+    if (!key.empty() && !value.empty()) {
+		std::cerr << "Adding directive " << key << " with value " << value << std::endl;
+        currentServer.directives[key] = value;
+    }
+}
+
 // default constructor
 ConfigHandler::ConfigHandler()
 {
@@ -18,10 +90,11 @@ ConfigHandler::ConfigHandler( std::string fileName )
 {
 	// get infile stream from file name
 	// std::ifstream fileIn = this->_getFileStream( fileName );
-	std::ifstream fileIn(fileName.c_str(), std::ifstream::in);
+	// std::ifstream fileIn(fileName.c_str(), std::ifstream::in);
 
 	// read file and construct to config data map
-	this->_initializedConfigDataMap( fileIn );
+	// this->_initializedConfigDataMap( fileIn );
+	this->_httpConfig = this->_parseHTTPConfig(fileName);
 }
 
 // destructor
@@ -125,28 +198,45 @@ void ConfigHandler::_initializedConfigDataMap(std::ifstream &file) {
 
 HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 {
+	// std::cerr << "Parsing " << filename << std::endl;
 	std::ifstream file(filename.c_str());
 	std::string line;
 	bool insideHttp = false;
 	bool insideServer = false;
 	Server currentServer;
-	class HTTPConfig httpConfig;
+	// class HTTPConfig httpConfig;
 
 	while (getline(file, line)) {
+
+		std::string::size_type startPos = line.find_first_not_of(" \t");
+		// skip empty line
+		if (startPos == std::string::npos) {
+			continue;
+		}
+
+		// Skip if line starts with '#'
+		if (line[startPos] == '#') {
+			// std::cerr << "Found comment" << std::endl;
+			continue;
+		}
+
 		if (line.find("http {") != std::string::npos) {
+			// std::cerr << "Found http block" << std::endl;
 			insideHttp = true;
 			continue;
 		}
 
 		if (insideHttp && line.find("server {") != std::string::npos) {
+			// std::cerr << "Found server block" << std::endl;
 			insideServer = true;
 			currentServer = Server();
 			continue;
 		}
 
 		if (insideServer && line.find("}") != std::string::npos) {
+			// std::cerr << "Found closing bracket" << std::endl;
 			insideServer = false;
-			httpConfig.servers.push_back(currentServer);
+			_httpConfig.servers.push_back(currentServer);
 			continue;
 		}
 
@@ -156,19 +246,22 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 			if (spacePos != std::string::npos) {
 				std::string key = line.substr(0, spacePos);
 				std::string value = line.substr(spacePos+1, line.find(";") - spacePos - 1);
-				httpConfig.directives[key] = value;
+				_httpConfig.directives[key] = value;
 			}
 			continue;
 		}
 
 		if (insideServer) {
 			// Parse server directives similarly. For simplicity, we won't handle location blocks here.
-			size_t spacePos = line.find(" ");
-			if (spacePos != std::string::npos) {
-				std::string key = line.substr(0, spacePos);
-				std::string value = line.substr(spacePos+1, line.find(";") - spacePos - 1);
-				currentServer.directives[key] = value;
-			}
+			std::cerr << "Parsing server directive" << std::endl;
+			std::cerr << line << std::endl;
+			// size_t spacePos = line.find(" ");
+			// if (spacePos != std::string::npos) {
+			// 	std::string key = line.substr(0, spacePos);
+			// 	std::string value = line.substr(spacePos+1, line.find(";") - spacePos - 1);
+			// 	currentServer.directives[key] = value;
+			// }
+			parseServerDirectives(line, currentServer);
 			continue;
 		}
 
@@ -177,12 +270,42 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 		}
 	}
 
-	return httpConfig;
+	return _httpConfig;
 }
 
 void ConfigHandler::printData()
 {
-	std::cout << _data << std::endl;
+	std::cerr << "Printing data" << std::endl;
+	std::vector<Server>::const_iterator serverIt; // Iterator for the servers vector
+	for (serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+		std::cerr << "Printing server" << std::endl;
+		const Server& server = *serverIt; // Reference to the current Server object
+
+		std::cout << "Server Names: ";
+		std::vector<std::string>::const_iterator nameIt; // Iterator for the server_names vector
+		for (nameIt = server.server_names.begin(); nameIt != server.server_names.end(); ++nameIt) {
+			std::cout << *nameIt << " ";
+		}
+		std::cout << std::endl;
+
+		// Replace 'address' and 'listen_port' with the actual member variable names for the Server class/struct.
+		// std::cout << "Address: " << server.address << std::endl; // Assuming 'address' is a string.
+		std::cout << "Port: " << server.listen_port << std::endl; // Assuming 'listen_port' is an int or compatible type.
+		std::cout << std::endl;
+    }
+}
+
+void ConfigHandler::printServerDirectives() const {
+	// Loop over each server in the configuration
+	for (std::vector<Server>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+		// std::cout << "Server Name: " << serverIt->server_names << std::endl;
+
+		// Now loop over the directives for this server
+		for (std::map<std::string, std::string>::const_iterator directiveIt = serverIt->directives.begin(); directiveIt != serverIt->directives.end(); ++directiveIt) {
+			std::cout << "Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+		}
+		std::cout << std::endl; // Add a newline for readability between servers
+	}
 }
 
 // FileOpenException

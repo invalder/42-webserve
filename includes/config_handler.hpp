@@ -56,7 +56,9 @@ class ConfigHandler
 
 		void			_initializedConfigDataMap( std::ifstream & );
 		// std::ifstream	_getFileStream( std::string );
-		static HTTPConfig 	_parseHTTPConfig(const std::string& filename);
+		HTTPConfig		_httpConfig;
+
+		HTTPConfig 	_parseHTTPConfig(const std::string& filename);
 
 	public:
 		ConfigHandler();
@@ -66,6 +68,12 @@ class ConfigHandler
 		ConfigHandler &operator=(const ConfigHandler &);
 
 		void	printData();
+
+		void	printHTTPConfig() const;
+		void	printHTTPDirectives() const;
+
+		void	printServerConfig() const;
+		void	printServerDirectives() const;
 
 	// exceptions
 	// file open exception

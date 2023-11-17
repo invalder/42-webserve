@@ -90,7 +90,10 @@ void ConfigHandler::_initializedConfigDataMap(std::ifstream &file) {
 
 			// if find port, get port number
 
-			// when find closing curly bracket of server block, store server block data to _configMap with key of server port and value of server config
+			// when find closing curly bracket of server block, 
+			// store server block data to _configMap with key of server port and value of server config
+			
+			// then exit server loop
 
 		}
 	}

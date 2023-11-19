@@ -54,25 +54,28 @@ void parseHttpDirectives(std::string line, HTTPConfig& httpConfig)
 }
 
 // Helper function to parse server directives
-void parseServerDirectives(std::string line, Server& currentServer) {
+void parseServerDirectives(std::string line, Server *currentServer) {
 	// Trim any leading and trailing whitespace from the line
 	trim(line);
-
+	std::cerr << "Trimmed line1: " << line << std::endl;
 	// Check if the line is a valid directive (must contain at least one space and end with a semicolon)
 	size_t semicolonPos = line.rfind(";");
 	if (semicolonPos == std::string::npos || semicolonPos == 0) {
 		// Not a valid directive line
+		std::cerr << "Not Valid semicolonPos: " << std::endl;
 		return;
 	}
 
 	// Extract the directive (excluding the semicolon)
 	std::string directive = line.substr(0, semicolonPos);
 	trim(directive);
+	std::cerr << "Trimmed directive: " << directive << std::endl;
 
 	// Find the space between the key and the value
-	size_t spacePos = directive.find(" ");
+	size_t spacePos = directive.find(": ");
 	if (spacePos == std::string::npos) {
 		// No space found, so it's not a key-value pair
+		std::cerr << "Not Valid spacePos: " << std::endl;
 		return;
 	}
 
@@ -87,7 +90,7 @@ void parseServerDirectives(std::string line, Server& currentServer) {
 	// Store the key-value pair in the directives map
 	if (!key.empty() && !value.empty()) {
 		std::cerr << "Adding directive " << key << " with value " << value << std::endl;
-		currentServer.directives[key] = value;
+		currentServer->directives[key] = value;
 	}
 }
 
@@ -222,10 +225,11 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 	std::string line;
 	bool insideHttp = false;
 	bool insideServer = false;
-	Server currentServer;
 	// class HTTPConfig httpConfig;
+	Server *currentServer;
 
 	while (getline(file, line)) {
+
 
 		std::string::size_type startPos = line.find_first_not_of(" \t");
 		// skip empty line
@@ -248,7 +252,7 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 		if (insideHttp && line.find("server {") != std::string::npos) {
 			// std::cerr << "Found server block" << std::endl;
 			insideServer = true;
-			currentServer = Server();
+			currentServer = new Server();
 			continue;
 		}
 
@@ -267,8 +271,8 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 			// 	std::string value = line.substr(spacePos+1, line.find(";") - spacePos - 1);
 			// 	_httpConfig.directives[key] = value;
 			// }
-			std::cerr << "Parsing http directive" << std::endl;
-			std::cerr << line << std::endl;
+			// std::cerr << "Parsing http directive" << std::endl;
+			// std::cerr << line << std::endl;
 			parseHttpDirectives(line, _httpConfig);
 			continue;
 		}
@@ -279,6 +283,7 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 			std::cerr << line << std::endl;
 
 			parseServerDirectives(line, currentServer);
+			// printServerDirectives();
 			continue;
 		}
 
@@ -290,39 +295,49 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 	return _httpConfig;
 }
 
-void ConfigHandler::printData()
-{
-	std::cerr << "Printing data" << std::endl;
-	std::vector<Server>::const_iterator serverIt; // Iterator for the servers vector
-	for (serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
-		std::cerr << "Printing server" << std::endl;
-		const Server& server = *serverIt; // Reference to the current Server object
+// void ConfigHandler::printData()
+// {
+// 	std::cerr << "Printing data" << std::endl;
+// 	std::vector<Server>::const_iterator serverIt; // Iterator for the servers vector
+// 	for (serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+// 		std::cerr << "Printing server" << std::endl;
+// 		const Server& server = *serverIt; // Reference to the current Server object
 
-		std::cout << "Server Names: ";
-		std::vector<std::string>::const_iterator nameIt; // Iterator for the server_names vector
-		for (nameIt = server.server_names.begin(); nameIt != server.server_names.end(); ++nameIt) {
-			std::cout << *nameIt << " ";
-		}
-		std::cout << std::endl;
+// 		std::cout << "Server Names: ";
+// 		std::vector<std::string>::const_iterator nameIt; // Iterator for the server_names vector
+// 		for (nameIt = server.server_names.begin(); nameIt != server.server_names.end(); ++nameIt) {
+// 			std::cout << *nameIt << " ";
+// 		}
+// 		std::cout << std::endl;
 
-		// Replace 'address' and 'listen_port' with the actual member variable names for the Server class/struct.
-		// std::cout << "Address: " << server.address << std::endl; // Assuming 'address' is a string.
-		std::cout << "Port: " << server.listen_port << std::endl; // Assuming 'listen_port' is an int or compatible type.
-		std::cout << std::endl;
-    }
-}
+// 		// Replace 'address' and 'listen_port' with the actual member variable names for the Server class/struct.
+// 		// std::cout << "Address: " << server.address << std::endl; // Assuming 'address' is a string.
+// 		std::cout << "Port: " << server.listen_port << std::endl; // Assuming 'listen_port' is an int or compatible type.
+// 		std::cout << std::endl;
+//     }
+// }
 
 void ConfigHandler::printServerDirectives() const {
 	// Loop over each server in the configuration
-	for (std::vector<Server>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+	for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
 		// std::cout << "Server Name: " << serverIt->server_names << std::endl;
 
 		// Now loop over the directives for this server
-		for (std::map<std::string, std::string>::const_iterator directiveIt = serverIt->directives.begin(); directiveIt != serverIt->directives.end(); ++directiveIt) {
-			std::cout << "Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+		for (std::map<std::string, std::string>::const_iterator directiveIt = (*serverIt)->directives.begin(); directiveIt != (*serverIt)->directives.end(); ++directiveIt) {
+			std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
 		}
-		std::cout << std::endl; // Add a newline for readability between servers
+		// std::cout << std::endl; // Add a newline for readability between servers
 	}
+
+	// for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+	// 	// std::cout << "Server Name: " << serverIt->server_names << std::endl;
+
+	// 	// Now loop over the directives for this server
+	// 	for (std::map<std::string, std::string>::const_iterator directiveIt = serverIt->directives.begin(); directiveIt != serverIt->directives.end(); ++directiveIt) {
+	// 		std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+	// 	}
+	// 	// std::cout << std::endl; // Add a newline for readability between servers
+	// }
 }
 
 void ConfigHandler::printHTTPDirectives() const {

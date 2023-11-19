@@ -34,7 +34,7 @@ class Server {
 class HTTPConfig {
 	public:
 		std::map<std::string, std::string> directives;
-		std::vector<Server> servers;
+		std::vector<Server *> servers;
 
 		// HTTPConfig();
 		// HTTPConfig(const HTTPConfig &);
@@ -67,7 +67,7 @@ class ConfigHandler
 		ConfigHandler(const ConfigHandler &);
 		ConfigHandler &operator=(const ConfigHandler &);
 
-		void	printData();
+		// void	printData();
 
 		void	printHTTPConfig() const;
 		void	printHTTPDirectives() const;

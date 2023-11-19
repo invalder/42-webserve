@@ -6,6 +6,12 @@
 #include <map>
 #include <vector>
 #include <exception>
+#include <string>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <unistd.h>
 
 class Location {
 	public:
@@ -20,15 +26,18 @@ class Location {
 
 class Server {
 	public:
+		int listener;
+		sockaddr_in addr;
+
 		int listen_port;
 		std::vector<std::string> server_names;
 		std::map<std::string, std::string> directives;
 		std::vector<Location> locations;
 
-		// Server();
+		Server();
 		// Server(const Server &);
 		// Server &operator=(const Server &);
-		// ~Server();
+		~Server();
 };
 
 class HTTPConfig {
@@ -74,6 +83,10 @@ class ConfigHandler
 
 		void	printServerConfig() const;
 		void	printServerDirectives() const;
+
+		void	bindAndSetSocketOptions() const;
+
+		void	execute() const;
 
 	// exceptions
 	// file open exception

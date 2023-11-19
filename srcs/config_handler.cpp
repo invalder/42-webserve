@@ -140,28 +140,6 @@ ConfigHandler &ConfigHandler::operator=(const ConfigHandler &other)
 	return *this;
 }
 
-// std::ifstream ConfigHandler::_getFileStream( std::string fileName )
-// {
-// 	// get extension of file from the last dot
-// 	std::string ext = fileName.substr(fileName.find_last_of(".") + 1);
-
-// 	// check if extension is .conf
-// 	if (ext.compare("conf"))
-// 	{
-// 		// if not, rasie exception
-// 		throw IncorrectExtensionException();
-// 	}
-
-// 	// open file
-// 	std::ifstream fileIn(fileName.c_str(), std::ifstream::in);
-// 	if (!fileIn.is_open())
-// 	{
-// 		throw FileOpenException();
-// 	}
-
-// 	return fileIn;
-// }
-
 /**
  * @brief Initialize config data map from data read from file stream
  * 	Steps:
@@ -179,41 +157,6 @@ void ConfigHandler::_initializedConfigDataMap(std::ifstream &file) {
 
 	while (std::getline(file, line))
 	{
-		// if (line.empty() or line[0] == '#')
-		// 	continue;
-		// if (line.find("http {") != std::string::npos)
-		// {
-		// 	insideHttp = true;
-		// 	continue;
-		// }
-
-		// if (insideHttp && line.find("server {") != std::string::npos)
-		// {
-		// 	insideServer = true;
-		// 	currentServer = Server();
-		// 	continue;
-		// }
-
-		// if (insideServer && line.find("}") != std::string::npos)
-		// {
-		// 	insideServer = false;
-		// 	_parseHTTPConfig.servers.push_back(currentServer);
-		// 	continue;
-		// }
-		// // skip empty line or comment line
-		// if (line.empty() or line[0] == '#')
-		// 	continue;
-
-		// // when find server block, read server block
-		// if (line.find("server") != std::string::npos)
-		// {
-		// 	// loop to run until find closing curly bracket of server block
-
-		// 	// if find port, get port number
-
-		// 	// when find closing curly bracket of server block, store server block data to _configMap with key of server port and value of server config
-
-		// }
 
 	}
 }
@@ -295,55 +238,69 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 	return _httpConfig;
 }
 
-// void ConfigHandler::printData()
-// {
-// 	std::cerr << "Printing data" << std::endl;
-// 	std::vector<Server>::const_iterator serverIt; // Iterator for the servers vector
-// 	for (serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
-// 		std::cerr << "Printing server" << std::endl;
-// 		const Server& server = *serverIt; // Reference to the current Server object
-
-// 		std::cout << "Server Names: ";
-// 		std::vector<std::string>::const_iterator nameIt; // Iterator for the server_names vector
-// 		for (nameIt = server.server_names.begin(); nameIt != server.server_names.end(); ++nameIt) {
-// 			std::cout << *nameIt << " ";
-// 		}
-// 		std::cout << std::endl;
-
-// 		// Replace 'address' and 'listen_port' with the actual member variable names for the Server class/struct.
-// 		// std::cout << "Address: " << server.address << std::endl; // Assuming 'address' is a string.
-// 		std::cout << "Port: " << server.listen_port << std::endl; // Assuming 'listen_port' is an int or compatible type.
-// 		std::cout << std::endl;
-//     }
-// }
-
 void ConfigHandler::printServerDirectives() const {
 	// Loop over each server in the configuration
 	for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
 		// std::cout << "Server Name: " << serverIt->server_names << std::endl;
-
+		std::cerr << "-------------------------------------------" << std::endl;
 		// Now loop over the directives for this server
 		for (std::map<std::string, std::string>::const_iterator directiveIt = (*serverIt)->directives.begin(); directiveIt != (*serverIt)->directives.end(); ++directiveIt) {
 			std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
 		}
-		// std::cout << std::endl; // Add a newline for readability between servers
+		std::cout << std::endl; // Add a newline for readability between servers
 	}
 
-	// for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
-	// 	// std::cout << "Server Name: " << serverIt->server_names << std::endl;
-
-	// 	// Now loop over the directives for this server
-	// 	for (std::map<std::string, std::string>::const_iterator directiveIt = serverIt->directives.begin(); directiveIt != serverIt->directives.end(); ++directiveIt) {
-	// 		std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
-	// 	}
-	// 	// std::cout << std::endl; // Add a newline for readability between servers
-	// }
 }
 
 void ConfigHandler::printHTTPDirectives() const {
 	// Loop over each directive in the configuration
 	for (std::map<std::string, std::string>::const_iterator directiveIt = _httpConfig.directives.begin(); directiveIt != _httpConfig.directives.end(); ++directiveIt) {
 		std::cout << "HTTP Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+	}
+}
+
+void ConfigHandler::bindAndSetSocketOptions() const {
+	// Loop over each server in the configuration
+	for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+		// std::cout << "Server Name: " << serverIt->server_names << std::endl;
+		std::cerr << "-------------------------------------------" << std::endl;
+		// Now loop over the directives for this server
+		for (std::map<std::string, std::string>::const_iterator directiveIt = (*serverIt)->directives.begin(); directiveIt != (*serverIt)->directives.end(); ++directiveIt) {
+			std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+		}
+		(*serverIt)->listener = socket(AF_INET, SOCK_STREAM, 0);
+		if ((*serverIt)->listener < 0) {
+			std::cerr << "Error creating socket" << std::endl;
+			continue;
+		}
+		(*serverIt)->addr.sin_family = AF_INET;
+		(*serverIt)->addr.sin_port = htons(atoi((*serverIt)->directives["listen"].c_str()));
+		(*serverIt)->addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		if (bind((*serverIt)->listener, (struct sockaddr *)&(*serverIt)->addr, sizeof((*serverIt)->addr)) < 0) {
+			std::cerr << "Error binding socket" << std::endl;
+			continue;
+		}
+		if (listen((*serverIt)->listener, 1024) < 0) {
+			std::cerr << "Error listening on socket" << std::endl;
+			continue;
+		}
+		std::cout << std::endl; // Add a newline for readability between servers
+	}
+}
+
+void ConfigHandler::execute() const {
+	std::cout << "Executing config" << std::endl;
+	while (true) {
+		// Loop over each server in the configuration
+		for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+			// std::cout << "Server Name: " << serverIt->server_names << std::endl;
+			std::cerr << "-------------------------------------------" << std::endl;
+			// Now loop over the directives for this server
+			// for (std::map<std::string, std::string>::const_iterator directiveIt = (*serverIt)->directives.begin(); directiveIt != (*serverIt)->directives.end(); ++directiveIt) {
+			// 	std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+			// }
+			// std::cout << std::endl; // Add a newline for readability between servers
+		}
 	}
 }
 
@@ -357,4 +314,14 @@ const char* ConfigHandler::FileOpenException::what() const throw()
 const char* ConfigHandler::IncorrectExtensionException::what() const throw()
 {
 	return "Error: Incorrect file extension";
+}
+
+Server::Server()
+{
+}
+
+Server::~Server()
+{
+	// clear listener
+	close(listener);
 }

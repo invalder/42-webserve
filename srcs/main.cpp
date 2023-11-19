@@ -10,9 +10,11 @@ int	main (int argc, char **argv)
 		// Construct configHandler with file name
 		ConfigHandler configHandler = ConfigHandler( fileName );
 		// configHandler.printData();
-		configHandler.printServerDirectives();
+		// configHandler.printServerDirectives();
 
-		configHandler.printHTTPDirectives();
+		// configHandler.printHTTPDirectives();
+
+		configHandler.bindAndSetSocketOptions();
 	} else {
 		std::cerr << "Parameters are more than 2" << std::endl;
 	}

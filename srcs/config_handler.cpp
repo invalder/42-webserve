@@ -117,6 +117,10 @@ ConfigHandler::ConfigHandler( std::string fileName )
 	// read file and construct to config data map
 	// this->_initializedConfigDataMap( fileIn );
 	this->_httpConfig = this->_parseHTTPConfig(fileName);
+
+	// TODO: please add what we have left to do in order know what we have left to do
+	// 1. parse location block
+	// 2. ...
 }
 
 // destructor

@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <map>
 #include <vector>
 #include <exception>
@@ -10,8 +11,21 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/select.h>
+#include <sys/ioctl.h>
+#include <sys/time.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
+
+typedef struct s_HttpRequset
+{
+	std::string method;
+	std::string path;
+	std::string httpVersion;
+	std::map<std::string, std::string> headers;
+	std::string body;
+} t_HttpRequest;
 
 class Location {
 	public:
@@ -30,7 +44,7 @@ class Server {
 		sockaddr_in addr;
 
 		int listen_port;
-		std::vector<std::string> server_names;
+		// std::vector<std::string> server_names;
 		std::map<std::string, std::string> directives;
 		std::vector<Location> locations;
 

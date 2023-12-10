@@ -54,11 +54,24 @@ class ConfigHandler
 		 */
 		std::map<std::string, std::string> _configMap;
 
+		std::map<std::string, std::string> _locationConfigMap;
+
+		std::map<std::string, std::string> _cgiConfigMap;
+
 		void			_initializedConfigDataMap( std::ifstream & );
 		// std::ifstream	_getFileStream( std::string );
 		HTTPConfig		_httpConfig;
 
 		HTTPConfig 	_parseHTTPConfig(const std::string& filename);
+
+		// function to parse cgi block
+		void	_parseCGIConfig(std::ifstream &file);
+
+		// function to parse server block
+		void	_parseLocationConfig(std::ifstream &file);
+
+		// function to parse upload block
+		void	_parseUploadConfig(std::ifstream &file);
 
 	public:
 		ConfigHandler();

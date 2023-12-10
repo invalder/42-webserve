@@ -106,6 +106,7 @@ ConfigHandler::ConfigHandler()
  * 	- if not, add .conf to the end of file name
  * 	- read file and save data to _data
  *
+
  * @param file file name with extension
  */
 ConfigHandler::ConfigHandler( std::string fileName )
@@ -117,10 +118,6 @@ ConfigHandler::ConfigHandler( std::string fileName )
 	// read file and construct to config data map
 	// this->_initializedConfigDataMap( fileIn );
 	this->_httpConfig = this->_parseHTTPConfig(fileName);
-
-	// TODO: please add what we have left to do in order know what we have left to do
-	// 1. parse location block
-	// 2. ...
 }
 
 // destructor
@@ -286,8 +283,27 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 			std::cerr << "Parsing server directive" << std::endl;
 			std::cerr << line << std::endl;
 
-			parseServerDirectives(line, currentServer);
 			// printServerDirectives();
+			// continue;
+
+			// TODO: please add what we have left to do in order know what we have left to do
+			// Location: {
+			//   CGI: {
+			//     ...
+			//   }
+			//   Upload: {
+			//     ...
+			//   }
+			// }
+
+			// when find location block, read location block
+			if (line.find("location") != std::string::npos) {
+				// get location map from location block
+				_parseLocationConfig(file);
+			}
+			else {
+				parseServerDirectives(line, currentServer);
+			}
 			continue;
 		}
 
@@ -297,6 +313,61 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 	}
 
 	return _httpConfig;
+}
+
+void ConfigHandler::_parseLocationConfig(std::ifstream &file)
+{
+	// loop over ifstream until find closing curly bracket of location block
+	// when find closing curly bracket of location block, return location map
+	for (std::string line; std::getline(file, line);) {
+		// when find CGI block, read CGI block
+		if (line.find("cgi") != std::string::npos) {
+			// get CGI map from CGI block
+			std::cout << "######### cgi #######" << std::endl << line << std::endl;
+			_parseCGIConfig(file);
+		}
+		else if (line.find("}") != std::string::npos) {
+			std::cout << "#########" << line << std::endl;
+			break ;
+		}
+		else if (line.find("upload") != std::string::npos) {
+			std::cout << "******* upload *******" << std::endl << line << std::endl;
+			_parseUploadConfig(file);
+		}
+		else {
+			// parse location directive
+			std::cout << line << std::endl;
+		}
+	}
+	return ;
+}
+
+void ConfigHandler::_parseCGIConfig(std::ifstream &file)
+{
+	// loop over ifstream until find closing curly bracket of location block
+	// when find closing curly bracket of location block, return location map
+	for (std::string line; std::getline(file, line);) {
+		if (line.find("}") != std::string::npos) {
+			break ;
+		}
+		else {
+			// parse location directive
+			std::cout << "===========" << line << std::endl;
+		}
+	}
+	return ;
+}
+
+void ConfigHandler::_parseUploadConfig(std::ifstream &file) {
+	for (std::string line; std::getline(file, line);) {
+		if (line.find("}") != std::string::npos) {
+			break ;
+		}
+		else {
+			// parse location directive
+			std::cout << "-------------" << line << std::endl;
+		}
+	}
 }
 
 // void ConfigHandler::printData()

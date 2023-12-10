@@ -66,6 +66,10 @@
 		"type_traits": "cpp",
 		"typeinfo": "cpp",
 		"utility": "cpp",
-		"vector": "cpp"
+		"vector": "cpp",
+		"__verbose_abort": "cpp",
+		"charconv": "cpp",
+		"clocale": "cpp",
+		"variant": "cpp"
 	}
 }

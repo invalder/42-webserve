@@ -1,28 +1,33 @@
 #include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-#include <fstream>
-#include <config_parser.hpp>
+#include "config_handler.hpp"
 
 int	main (int argc, char **argv)
 {
-	if (argc > 2)
+	if (argc <= 2)
 	{
+		std::string fileName = argv[1] ? argv[1] : "webserve.conf";
+
+		// Construct configHandler with file name
+		try {
+			ConfigHandler configHandler = ConfigHandler( fileName );
+
+			configHandler.bindAndSetSocketOptions();
+			configHandler.execute();
+		} catch (std::exception &e) {
+			std::cerr << e.what() << std::endl;
+		}
+		// ConfigHandler configHandler = ConfigHandler( fileName );
+
+		// configHandler.printData();
+		// configHandler.printServerDirectives();
+
+		// configHandler.printHTTPDirectives();
+
+		// configHandler.bindAndSetSocketOptions();
+		// configHandler.execute();
+	} else {
 		std::cerr << "Parameters are more than 2" << std::endl;
 	}
-	// with specific conf file
-	else if (argc == 2)
-	{
-		ConfigParser startingData(argv[1]);
-	}
-	// without conf file, use default
-	else if (argc == 1)
-	{
-		ConfigParser startingData("webserve.conf");
-	}
-
 
 	return 0;
 }
-

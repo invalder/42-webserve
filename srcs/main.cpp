@@ -8,11 +8,23 @@ int	main (int argc, char **argv)
 		std::string fileName = argv[1] ? argv[1] : "webserve.conf";
 
 		// Construct configHandler with file name
-		ConfigHandler configHandler = ConfigHandler( fileName );
-		// configHandler.printData();
-		configHandler.printServerDirectives();
+		try {
+			ConfigHandler configHandler = ConfigHandler( fileName );
 
-		configHandler.printHTTPDirectives();
+			configHandler.bindAndSetSocketOptions();
+			configHandler.execute();
+		} catch (std::exception &e) {
+			std::cerr << e.what() << std::endl;
+		}
+		// ConfigHandler configHandler = ConfigHandler( fileName );
+
+		// configHandler.printData();
+		// configHandler.printServerDirectives();
+
+		// configHandler.printHTTPDirectives();
+
+		// configHandler.bindAndSetSocketOptions();
+		// configHandler.execute();
 	} else {
 		std::cerr << "Parameters are more than 2" << std::endl;
 	}

@@ -106,7 +106,6 @@ ConfigHandler::ConfigHandler()
  * 	- if not, add .conf to the end of file name
  * 	- read file and save data to _data
  *
-
  * @param file file name with extension
  */
 ConfigHandler::ConfigHandler( std::string fileName )
@@ -141,28 +140,6 @@ ConfigHandler &ConfigHandler::operator=(const ConfigHandler &other)
 	return *this;
 }
 
-// std::ifstream ConfigHandler::_getFileStream( std::string fileName )
-// {
-// 	// get extension of file from the last dot
-// 	std::string ext = fileName.substr(fileName.find_last_of(".") + 1);
-
-// 	// check if extension is .conf
-// 	if (ext.compare("conf"))
-// 	{
-// 		// if not, rasie exception
-// 		throw IncorrectExtensionException();
-// 	}
-
-// 	// open file
-// 	std::ifstream fileIn(fileName.c_str(), std::ifstream::in);
-// 	if (!fileIn.is_open())
-// 	{
-// 		throw FileOpenException();
-// 	}
-
-// 	return fileIn;
-// }
-
 /**
  * @brief Initialize config data map from data read from file stream
  * 	Steps:
@@ -180,48 +157,114 @@ void ConfigHandler::_initializedConfigDataMap(std::ifstream &file) {
 
 	while (std::getline(file, line))
 	{
-		// if (line.empty() or line[0] == '#')
-		// 	continue;
-		// if (line.find("http {") != std::string::npos)
-		// {
-		// 	insideHttp = true;
-		// 	continue;
-		// }
-
-		// if (insideHttp && line.find("server {") != std::string::npos)
-		// {
-		// 	insideServer = true;
-		// 	currentServer = Server();
-		// 	continue;
-		// }
-
-		// if (insideServer && line.find("}") != std::string::npos)
-		// {
-		// 	insideServer = false;
-		// 	_parseHTTPConfig.servers.push_back(currentServer);
-		// 	continue;
-		// }
-		// // skip empty line or comment line
-		// if (line.empty() or line[0] == '#')
-		// 	continue;
-
-		// // when find server block, read server block
-		// if (line.find("server") != std::string::npos)
-		// {
-		// 	// loop to run until find closing curly bracket of server block
-
-		// 	// if find port, get port number
-
-		// 	// when find closing curly bracket of server block, store server block data to _configMap with key of server port and value of server config
-
-		// }
 
 	}
 }
 
+t_HttpRequest parseHttpRequest(std::string requestString) {
+	t_HttpRequest request;
+	std::istringstream requestStream(requestString);
+	std::string line;
+	bool headerSection = true;
+
+	// Parse the request line
+	if (std::getline(requestStream, line) && !line.empty()) {
+		std::istringstream lineStream(line);
+		lineStream >> request.method >> request.path >> request.httpVersion;
+	}
+
+	// Parse headers and body
+	while (std::getline(requestStream, line)) {
+		// Handle different line endings
+		std::string::size_type end = line.find("\r");
+		if (end != std::string::npos) {
+			line.erase(end);
+		}
+
+		// Check for the end of the header section
+		if (line.empty() && headerSection) {
+			headerSection = false;
+			continue;
+		}
+
+		if (headerSection) {
+			std::string::size_type pos = line.find(":");
+			if (pos != std::string::npos) {
+				std::string headerName = line.substr(0, pos);
+				std::string headerValue = line.substr(pos + 2);  // Skip the ": "
+				request.headers[headerName] = headerValue;
+			}
+		} else {
+			// Add to body
+			request.body += line;
+			if (!requestStream.eof()) {
+				request.body += "\n";  // Maintain line breaks in body
+			}
+		}
+	}
+
+	return request;
+}
+
+// Function to match the request to a server
+Server* matchRequestToServer(const t_HttpRequest& request, const std::vector<Server*>& servers) {
+	std::string requestedHost;
+
+	// Find the "Host" header in a const-safe manner
+	std::map<std::string, std::string>::const_iterator itHost = request.headers.find("Host");
+	if (itHost != request.headers.end()) {
+		requestedHost = itHost->second;
+	} else {
+		// Handle case where "Host" header is not found
+		return 0; // Or handle it according to your application logic
+	}
+
+	// Optionally, you can parse the port from the requested host if it's in the format "host:port"
+	size_t colonPos = requestedHost.find(":");
+	if (colonPos != std::string::npos) {
+		requestedHost = requestedHost.substr(0, colonPos);
+	}
+
+	for (std::vector<Server*>::const_iterator it = servers.begin(); it != servers.end(); ++it) {
+		std::map<std::string, std::string>::const_iterator itDirective = (*it)->directives.find("server_name");
+		if (itDirective != (*it)->directives.end()) {
+			// Split the server names by spaces and match each one
+			std::istringstream iss(itDirective->second);
+			std::string serverName;
+			while (iss >> serverName) {
+				if (serverName == requestedHost) {
+					// Found a matching server
+					return *it;
+				}
+			}
+		}
+	}
+	return 0; // No matching server found
+}
+
+
+
+/**
+ * @brief Get file stream from file name
+ * 	Steps:
+ * 	- check if file extension is .conf
+ * 	- if not, add .conf to the end of file name
+ * 	- return file stream
+ *
+ * @param fileName file name with extension
+ * @return HTTPConfig
+ */
 HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 {
 	// std::cerr << "Parsing " << filename << std::endl;
+
+	// Check if the file extension is .conf
+	std::string extension = filename.substr(filename.find_last_of(".") + 1);
+	if (extension != "conf") {
+		std::cerr << "Incorrect file extension" << std::endl;
+		throw IncorrectExtensionException();
+	}
+
 	std::ifstream file(filename.c_str());
 	std::string line;
 	bool insideHttp = false;
@@ -265,15 +308,7 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 		}
 
 		if (insideHttp && !insideServer) {
-			// Parse general http directives, for simplicity, let's say each directive is on its own line.
-			// size_t spacePos = line.find(" ");
-			// if (spacePos != std::string::npos) {
-			// 	std::string key = line.substr(0, spacePos);
-			// 	std::string value = line.substr(spacePos+1, line.find(";") - spacePos - 1);
-			// 	_httpConfig.directives[key] = value;
-			// }
-			// std::cerr << "Parsing http directive" << std::endl;
-			// std::cerr << line << std::endl;
+			// Parse http directives
 			parseHttpDirectives(line, _httpConfig);
 			continue;
 		}
@@ -283,27 +318,8 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 			std::cerr << "Parsing server directive" << std::endl;
 			std::cerr << line << std::endl;
 
+			parseServerDirectives(line, currentServer);
 			// printServerDirectives();
-			// continue;
-
-			// TODO: please add what we have left to do in order know what we have left to do
-			// Location: {
-			//   CGI: {
-			//     ...
-			//   }
-			//   Upload: {
-			//     ...
-			//   }
-			// }
-
-			// when find location block, read location block
-			if (line.find("location") != std::string::npos) {
-				// get location map from location block
-				_parseLocationConfig(file);
-			}
-			else {
-				parseServerDirectives(line, currentServer);
-			}
 			continue;
 		}
 
@@ -315,110 +331,165 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 	return _httpConfig;
 }
 
-void ConfigHandler::_parseLocationConfig(std::ifstream &file)
-{
-	// loop over ifstream until find closing curly bracket of location block
-	// when find closing curly bracket of location block, return location map
-	for (std::string line; std::getline(file, line);) {
-		// when find CGI block, read CGI block
-		if (line.find("cgi") != std::string::npos) {
-			// get CGI map from CGI block
-			std::cout << "######### cgi #######" << std::endl << line << std::endl;
-			_parseCGIConfig(file);
-		}
-		else if (line.find("}") != std::string::npos) {
-			std::cout << "#########" << line << std::endl;
-			break ;
-		}
-		else if (line.find("upload") != std::string::npos) {
-			std::cout << "******* upload *******" << std::endl << line << std::endl;
-			_parseUploadConfig(file);
-		}
-		else {
-			// parse location directive
-			std::cout << line << std::endl;
-		}
-	}
-	return ;
-}
-
-void ConfigHandler::_parseCGIConfig(std::ifstream &file)
-{
-	// loop over ifstream until find closing curly bracket of location block
-	// when find closing curly bracket of location block, return location map
-	for (std::string line; std::getline(file, line);) {
-		if (line.find("}") != std::string::npos) {
-			break ;
-		}
-		else {
-			// parse location directive
-			std::cout << "===========" << line << std::endl;
-		}
-	}
-	return ;
-}
-
-void ConfigHandler::_parseUploadConfig(std::ifstream &file) {
-	for (std::string line; std::getline(file, line);) {
-		if (line.find("}") != std::string::npos) {
-			break ;
-		}
-		else {
-			// parse location directive
-			std::cout << "-------------" << line << std::endl;
-		}
-	}
-}
-
-// void ConfigHandler::printData()
-// {
-// 	std::cerr << "Printing data" << std::endl;
-// 	std::vector<Server>::const_iterator serverIt; // Iterator for the servers vector
-// 	for (serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
-// 		std::cerr << "Printing server" << std::endl;
-// 		const Server& server = *serverIt; // Reference to the current Server object
-
-// 		std::cout << "Server Names: ";
-// 		std::vector<std::string>::const_iterator nameIt; // Iterator for the server_names vector
-// 		for (nameIt = server.server_names.begin(); nameIt != server.server_names.end(); ++nameIt) {
-// 			std::cout << *nameIt << " ";
-// 		}
-// 		std::cout << std::endl;
-
-// 		// Replace 'address' and 'listen_port' with the actual member variable names for the Server class/struct.
-// 		// std::cout << "Address: " << server.address << std::endl; // Assuming 'address' is a string.
-// 		std::cout << "Port: " << server.listen_port << std::endl; // Assuming 'listen_port' is an int or compatible type.
-// 		std::cout << std::endl;
-//     }
-// }
-
 void ConfigHandler::printServerDirectives() const {
 	// Loop over each server in the configuration
 	for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
 		// std::cout << "Server Name: " << serverIt->server_names << std::endl;
-
+		std::cerr << "-------------------------------------------" << std::endl;
 		// Now loop over the directives for this server
 		for (std::map<std::string, std::string>::const_iterator directiveIt = (*serverIt)->directives.begin(); directiveIt != (*serverIt)->directives.end(); ++directiveIt) {
 			std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
 		}
-		// std::cout << std::endl; // Add a newline for readability between servers
+		std::cout << std::endl; // Add a newline for readability between servers
 	}
 
-	// for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
-	// 	// std::cout << "Server Name: " << serverIt->server_names << std::endl;
-
-	// 	// Now loop over the directives for this server
-	// 	for (std::map<std::string, std::string>::const_iterator directiveIt = serverIt->directives.begin(); directiveIt != serverIt->directives.end(); ++directiveIt) {
-	// 		std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
-	// 	}
-	// 	// std::cout << std::endl; // Add a newline for readability between servers
-	// }
 }
 
 void ConfigHandler::printHTTPDirectives() const {
 	// Loop over each directive in the configuration
 	for (std::map<std::string, std::string>::const_iterator directiveIt = _httpConfig.directives.begin(); directiveIt != _httpConfig.directives.end(); ++directiveIt) {
 		std::cout << "HTTP Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+	}
+}
+
+void ConfigHandler::bindAndSetSocketOptions() const {
+	// Loop over each server in the configuration
+	for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+		// std::cout << "Server Name: " << serverIt->server_names << std::endl;
+		std::cerr << "-------------------------------------------" << std::endl;
+		// Now loop over the directives for this server
+		for (std::map<std::string, std::string>::const_iterator directiveIt = (*serverIt)->directives.begin(); directiveIt != (*serverIt)->directives.end(); ++directiveIt) {
+			std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+		}
+		(*serverIt)->listener = socket(AF_INET, SOCK_STREAM, 0);
+		if ((*serverIt)->listener < 0) {
+			std::cerr << "Error creating socket" << std::endl;
+			continue;
+		}
+
+		// Set socket to non-blocking
+		int flags = fcntl((*serverIt)->listener, F_GETFL, 0);
+		if (flags < 0) {
+			std::cerr << "Error getting socket flags" << std::endl;
+			continue;
+		}
+
+		// Set socket options
+		struct timeval timeout;
+		timeout.tv_sec = 5;
+		timeout.tv_usec = 0;
+		if (setsockopt((*serverIt)->listener, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+			std::cerr << "Error setting socket options" << std::endl;
+			continue;
+		}
+
+		// Bind socket
+		(*serverIt)->addr.sin_family = AF_INET;
+		(*serverIt)->addr.sin_port = htons(atoi((*serverIt)->directives["listen"].c_str()));
+		(*serverIt)->addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		if (bind((*serverIt)->listener, (struct sockaddr *)&(*serverIt)->addr, sizeof((*serverIt)->addr)) < 0) {
+			std::cerr << "Error binding socket" << std::endl;
+			continue;
+		}
+		// Listen on socket
+		if (listen((*serverIt)->listener, 1024) < 0) {
+			std::cerr << "Error listening on socket" << std::endl;
+			continue;
+		}
+		std::cout << std::endl; // Add a newline for readability between servers
+		std::cout << "Listening on port " << (*serverIt)->directives["listen"] << std::endl;
+	}
+}
+
+void ConfigHandler::execute() const {
+	std::cout << "Executing config" << std::endl;
+
+	fd_set readfds;
+	std::vector<int> activeSockets;
+	std::vector<int>::iterator it;
+
+	while (true) {
+		FD_ZERO(&readfds);
+
+		// Add listening sockets to the set
+		for (std::vector<Server*>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+			FD_SET((*serverIt)->listener, &readfds);
+		}
+
+		// Add active sockets to the set
+		for (it = activeSockets.begin(); it != activeSockets.end(); ++it) {
+			FD_SET(*it, &readfds);
+		}
+
+		// Wait for an activity on one of the sockets
+		int activity = select(FD_SETSIZE, &readfds, NULL, NULL, NULL);
+		if (activity < 0) {
+			std::cerr << "Error selecting" << std::endl;
+			continue;
+		}
+
+		// Accept new connections
+		for (std::vector<Server*>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt) {
+			if (FD_ISSET((*serverIt)->listener, &readfds)) {
+				int newSocket = accept((*serverIt)->listener, NULL, NULL);
+				if (newSocket < 0) {
+					std::cerr << "Error accepting connection" << std::endl;
+					continue;
+				}
+
+				// Set the new socket to non-blocking mode
+				int flags = fcntl(newSocket, F_GETFL, 0);
+				fcntl(newSocket, F_SETFL, flags | O_NONBLOCK);
+
+				// Add new socket to active sockets (assumed to be in blocking mode)
+				activeSockets.push_back(newSocket);
+			}
+		}
+
+		// Read data from active sockets
+		for (it = activeSockets.begin(); it != activeSockets.end();) {
+			if (FD_ISSET(*it, &readfds)) {
+				char buffer[4096];
+				ssize_t bytesReceived = recv(*it, buffer, sizeof(buffer), 0);
+
+				std::cout << "Received " << bytesReceived << " bytes" << std::endl;
+				std::cout << "Buffer: " << buffer << std::endl;
+
+				if (bytesReceived > 0) {
+					// Process the data
+					//std::string response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
+					//send(*it, response.c_str(), response.length(), 0);
+					std::string response = "";
+					std::string requestString(buffer, bytesReceived);
+					// check host and path
+					t_HttpRequest request = parseHttpRequest(requestString);
+
+					Server* matchedServer = matchRequestToServer(request, _httpConfig.servers);
+					if (matchedServer) {
+						std::cout << "Matched server" << std::endl;
+						response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
+					} else {
+						std::cout << "No matching server found" << std::endl;
+						response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
+					}
+
+					send(*it, response.c_str(), response.length(), 0);
+
+				} else if (bytesReceived == 0) {
+					// Client closed connection
+					close(*it);
+					it = activeSockets.erase(it); // Erase returns the next iterator
+					continue;
+				} else {
+					// Connection closed or an error occurred
+					std::cerr << "Error receiving data" << std::endl;
+					close(*it);
+					it = activeSockets.erase(it); // Erase returns the next iterator
+					continue;
+				}
+			}
+			++it;
+		}
 	}
 }
 
@@ -432,4 +503,14 @@ const char* ConfigHandler::FileOpenException::what() const throw()
 const char* ConfigHandler::IncorrectExtensionException::what() const throw()
 {
 	return "Error: Incorrect file extension";
+}
+
+Server::Server()
+{
+}
+
+Server::~Server()
+{
+	// clear listener
+	close(listener);
 }

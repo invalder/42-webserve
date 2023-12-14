@@ -15,6 +15,125 @@ static inline std::string& trim(std::string& s) {
 	return ltrim(rtrim(s));
 }
 
+static inline int	splitKeyValue(std::string line, std::string &key, std::string &value)
+{
+	size_t semicolonPos = line.rfind(";");
+	if (semicolonPos == std::string::npos || semicolonPos == 0) {
+	// Not a valid directive line
+		std::cerr << "Not Valid semicolonPos: " << std::endl;
+		return 1;
+	}
+
+	line = line.substr(0, semicolonPos);
+	trim(line);
+
+	// find tab first, if no tab --> find space
+	size_t	spacePos = line.find("\t");
+	
+	if (spacePos == std::string::npos) {
+		spacePos = line.find(" ");
+		if (spacePos == std::string::npos) {
+			std::cerr << "Not Valid spacePos: " << std::endl;
+			return 1;
+		}
+	}
+	key = line.substr(0, spacePos);
+	value = line.substr(spacePos + 1);
+
+	size_t colonPos = line.rfind(":");
+	if (colonPos != std::string::npos) {
+		key = key.substr(0, colonPos);
+	}
+
+	trim(key);
+	trim(value);
+
+	return 0;
+}
+
+void	parseDefaultErrorPages(std::ifstream &file, HTTPConfig& httpConfig)
+{
+	std::string	line;
+
+	while (getline(file, line)) {
+		if (line.find("}") != std::string::npos) {
+			break ;
+		}
+
+		std::string key, value;
+		if (splitKeyValue(line, key, value)) {
+			continue ;
+		}
+
+		if (!key.empty() && !value.empty()) {
+			httpConfig.defaultErrorPages[key] = value;
+		}
+	}
+	return ;
+}
+
+static inline void	parseAddMap(std::ifstream &file, std::map<std::string, std::string> &toAdd)
+{
+	std::string	line;
+
+	while (getline(file, line)) {
+		if (line.find("}") != std::string::npos) {
+			break;
+		}
+
+		std::string	key, value;
+		if (splitKeyValue(line, key, value)) {
+			continue ;
+		}
+
+		if (!key.empty() && !value.empty()) {
+			toAdd[key] = value;
+		}
+	}
+}
+
+void	parseLocationConfig(std::ifstream &file, Server *currentServer, std::string line)
+{
+	bool		insideCgi = false;
+	bool		insideUpload = false;
+
+	trim(line);
+	// get location path from first line
+	line = line.substr(0, line.length() - 1);
+	line = line.substr(9, line.length() - 10);
+	
+	Location	toAddLoc;
+	toAddLoc.path = line;
+
+	// loop until }
+	while (getline(file, line)) {
+		if (line.find("}") != std::string::npos)
+			break ;
+		
+		if (line.find("cgi") != std::string::npos && line.find("{") != std::string::npos) {
+			// add cgi to current location
+			parseAddMap(file, toAddLoc.cgi);
+		}
+		else if (line.find("upload") != std::string::npos && line.find("{") != std::string::npos) {
+			// add upload to current location
+			parseAddMap(file, toAddLoc.upload);
+		}
+		else {
+			// add directive
+			std::string	key, value;
+			if (splitKeyValue(line, key, value)) {
+				continue ;
+			}
+
+			if (!key.empty() && !value.empty()) {
+				toAddLoc.directives[key] = value;
+			}
+		}
+	}
+
+	currentServer->locations.push_back(toAddLoc);
+}
+
 void parseHttpDirectives(std::string line, HTTPConfig& httpConfig)
 {
 	// Trim any leading and trailing whitespace from the line
@@ -32,10 +151,13 @@ void parseHttpDirectives(std::string line, HTTPConfig& httpConfig)
 	trim(directive);
 
 	// Find the space between the key and the value
-	size_t spacePos = directive.find(" ");
+	size_t spacePos = directive.find("\t");
 	if (spacePos == std::string::npos) {
-		// No space found, so it's not a key-value pair
-		return;
+		spacePos = directive.find(" ");
+		if (spacePos == std::string::npos) {
+			// No space found, so it's not a key-value pair
+			return;
+		}
 	}
 
 	// Extract the key and value
@@ -46,9 +168,14 @@ void parseHttpDirectives(std::string line, HTTPConfig& httpConfig)
 	trim(key);
 	trim(value);
 
+	size_t colonPos = line.rfind(":");
+	if (colonPos != std::string::npos) {
+		key = key.substr(0, colonPos);
+	}
+
 	// Store the key-value pair in the directives map
 	if (!key.empty() && !value.empty()) {
-		std::cerr << "Adding directive " << key << " with value " << value << std::endl;
+		// std::cerr << "Adding directive " << key << " with value " << value << std::endl;
 		httpConfig.directives[key] = value;
 	}
 }
@@ -57,7 +184,7 @@ void parseHttpDirectives(std::string line, HTTPConfig& httpConfig)
 void parseServerDirectives(std::string line, Server *currentServer) {
 	// Trim any leading and trailing whitespace from the line
 	trim(line);
-	std::cerr << "Trimmed line1: " << line << std::endl;
+	// std::cerr << "Trimmed line1: " << line << std::endl;
 	// Check if the line is a valid directive (must contain at least one space and end with a semicolon)
 	size_t semicolonPos = line.rfind(";");
 	if (semicolonPos == std::string::npos || semicolonPos == 0) {
@@ -69,7 +196,7 @@ void parseServerDirectives(std::string line, Server *currentServer) {
 	// Extract the directive (excluding the semicolon)
 	std::string directive = line.substr(0, semicolonPos);
 	trim(directive);
-	std::cerr << "Trimmed directive: " << directive << std::endl;
+	// std::cerr << "Trimmed directive: " << directive << std::endl;
 
 	// Find the space between the key and the value
 	size_t spacePos = directive.find(": ");
@@ -89,7 +216,7 @@ void parseServerDirectives(std::string line, Server *currentServer) {
 
 	// Store the key-value pair in the directives map
 	if (!key.empty() && !value.empty()) {
-		std::cerr << "Adding directive " << key << " with value " << value << std::endl;
+		// std::cerr << "Adding directive " << key << " with value " << value << std::endl;
 		currentServer->directives[key] = value;
 	}
 }
@@ -308,6 +435,10 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 		}
 
 		if (insideHttp && !insideServer) {
+			// cx if default error pages
+			if (line.find("default_error_pages {") != std::string::npos) {
+				parseDefaultErrorPages(file, _httpConfig);
+			}
 			// Parse http directives
 			parseHttpDirectives(line, _httpConfig);
 			continue;
@@ -315,9 +446,10 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 
 		if (insideServer) {
 			// Parse server directives similarly. For simplicity, we won't handle location blocks here.
-			std::cerr << "Parsing server directive" << std::endl;
-			std::cerr << line << std::endl;
-
+			// std::cerr << "Parsing server directive" << line << std::endl;
+			if (currentServer && line.find("location ") != std::string::npos && line.find(" {") != std::string::npos) {
+				parseLocationConfig(file, currentServer, line);
+			}
 			parseServerDirectives(line, currentServer);
 			// printServerDirectives();
 			continue;
@@ -513,4 +645,77 @@ Server::~Server()
 {
 	// clear listener
 	close(listener);
+}
+
+
+// ==================== For Test ==============================
+// =================== Remove Before Push =====================
+// ===================== Or left it ?? ========================
+
+void	ConfigHandler::testPrintAll() const
+{
+	std::map<std::string, std::string>::const_iterator	cur;
+	std::map<std::string, std::string>::const_iterator	end;
+
+	std::cout << "============== HTTP config ==============" << std::endl;
+	cur = _httpConfig.directives.begin();
+	end = _httpConfig.directives.end();
+	while (cur != end) {
+		std::cout << std::setw(10) << "HTTP =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+		cur++;
+	}
+	std::cout << "=============== default err pages ===============" << std::endl;
+	cur = _httpConfig.defaultErrorPages.begin();
+	end = _httpConfig.defaultErrorPages.end();
+	while (cur != end) {
+		std::cout << std::setw(10) << "DEPs =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+		cur++;
+	}
+
+	std::vector<Server *>::const_iterator curServ = _httpConfig.servers.begin();
+
+	while (curServ != _httpConfig.servers.end()) {
+		std::cout << "============== Server config ==============" << std::endl;
+		std::cout << std::setw(10) << "SERVER =" << std::setw(25)  << "listener" << " | " << (*curServ)->listener << std::endl;
+		// socket address ????
+		std::cout << std::setw(10) << "SERVER =" << std::setw(25)  << "listen port" << " | " << (*curServ)->listen_port << std::endl;
+		// server Directive
+		cur = (*curServ)->directives.begin();
+		end = (*curServ)->directives.end();
+		while (cur != end) {
+			std::cout << std::setw(10) << "SERVER =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+			cur++;
+		}
+		std::vector<Location>::const_iterator	curLoc = (*curServ)->locations.begin();
+		std::vector<Location>::const_iterator	endLoc = (*curServ)->locations.end();
+		while (curLoc != endLoc) {
+			// print content in loc
+			std::cout << "------------------ Location config ------------------" << std::endl;
+			std::cout << std::setw(10) << "LOC =" << std::setw(25) << "Location path" << " | " << curLoc->path << std::endl;
+			cur = curLoc->directives.begin();
+			end = curLoc->directives.end();
+			while (cur != end) {
+				std::cout << std::setw(10) << "LOC dir =" << std::setw(25) << cur->first <<  " | " << cur->second << std::endl;
+				cur++;
+			}
+			// cgi
+			cur = curLoc->cgi.begin();
+			end = curLoc->cgi.end();
+			while (cur != end) {
+				std::cout << std::setw(10) << "LOC cgi =" << std::setw(25) << cur->first <<  " | " << cur->second << std::endl;
+				cur++;
+			}
+
+			// upload
+			cur = curLoc->upload.begin();
+			end = curLoc->upload.end();
+			while (cur != end) {
+				std::cout << std::setw(10) << "LOC upld =" << std::setw(25) << cur->first <<  " | " << cur->second << std::endl;
+				cur++;
+			}
+			curLoc++;
+		}
+		curServ++;
+	}
+	return ;
 }

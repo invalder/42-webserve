@@ -1,6 +1,9 @@
 #ifndef CONFIG_HANDLER_HPP
 #define CONFIG_HANDLER_HPP
 
+// for easy read test
+#include <iomanip>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -32,6 +35,9 @@ class Location {
 		std::string path;
 		std::map<std::string, std::string> directives;
 
+		std::map<std::string, std::string>	cgi;
+		std::map<std::string, std::string>	upload;
+
 		// Location();
 		// Location(const Location &);
 		// Location &operator=(const Location &);
@@ -57,6 +63,7 @@ class Server {
 class HTTPConfig {
 	public:
 		std::map<std::string, std::string> directives;
+		std::map<std::string, std::string> defaultErrorPages;
 		std::vector<Server *> servers;
 
 		// HTTPConfig();
@@ -114,6 +121,9 @@ class ConfigHandler
 		void	bindAndSetSocketOptions() const;
 
 		void	execute() const;
+
+		// ===== ForTest Remove Bofore Push =====
+		void	testPrintAll() const;
 
 	// exceptions
 	// file open exception

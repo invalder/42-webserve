@@ -11,13 +11,15 @@ int	main (int argc, char **argv)
 		try {
 			ConfigHandler configHandler = ConfigHandler( fileName );
 
+			configHandler.testPrintAll();
+
 			configHandler.bindAndSetSocketOptions();
 			configHandler.execute();
 		} catch (std::exception &e) {
 			std::cerr << e.what() << std::endl;
 		}
 		// ConfigHandler configHandler = ConfigHandler( fileName );
-
+ 
 		// configHandler.printData();
 		// configHandler.printServerDirectives();
 

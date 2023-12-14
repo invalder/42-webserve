@@ -94,9 +94,6 @@ static inline void	parseAddMap(std::ifstream &file, std::map<std::string, std::s
 
 void	parseLocationConfig(std::ifstream &file, Server *currentServer, std::string line)
 {
-	bool		insideCgi = false;
-	bool		insideUpload = false;
-
 	trim(line);
 	// get location path from first line
 	line = line.substr(0, line.length() - 1);

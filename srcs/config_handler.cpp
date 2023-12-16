@@ -20,7 +20,7 @@ static inline int	splitKeyValue(std::string line, std::string &key, std::string 
 	size_t semicolonPos = line.rfind(";");
 	if (semicolonPos == std::string::npos || semicolonPos == 0) {
 	// Not a valid directive line
-		std::cerr << "Not Valid semicolonPos: " << std::endl;
+		// std::cerr << "Not Valid semicolonPos: " << std::endl;
 		return 1;
 	}
 
@@ -130,6 +130,20 @@ void	parseLocationConfig(std::ifstream &file, Server *currentServer, std::string
 
 	currentServer->locations.push_back(toAddLoc);
 }
+
+static void	parseGlobalConfig(std::string line, std::map<std::string, std::string> &toAdd)
+{
+	std::string	key, value;
+
+	trim(line);
+	if (splitKeyValue(line, key, value)) {
+		return ;
+	}
+
+	toAdd[key] = value;
+
+}
+
 
 void parseHttpDirectives(std::string line, HTTPConfig& httpConfig)
 {
@@ -452,6 +466,11 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 			continue;
 		}
 
+		if (!insideServer && !insideHttp) {
+			std::cout << "TEST == |" << line << "|" << std::endl;
+			parseGlobalConfig(line, _globalConfig);
+		}
+
 		if (line.find("}") != std::string::npos) {
 			insideHttp = false;
 		}
@@ -654,6 +673,14 @@ void	ConfigHandler::testPrintAll() const
 	std::map<std::string, std::string>::const_iterator	cur;
 	std::map<std::string, std::string>::const_iterator	end;
 
+	std::cout << "============== Global Config ===============" << std::endl;
+	cur = _globalConfig.begin();
+	end = _globalConfig.end();
+	while (cur != end) {
+		std::cout << std::setw(10) << "Global =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+		cur++;
+	}
+	
 	std::cout << "============== HTTP config ==============" << std::endl;
 	cur = _httpConfig.directives.begin();
 	end = _httpConfig.directives.end();

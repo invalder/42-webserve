@@ -4,6 +4,9 @@
 // for easy read test
 #include <iomanip>
 
+#include <cstdlib>
+#include <algorithm>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -82,6 +85,8 @@ class ConfigHandler
 		 * 	- key : server port
 		 * 	- value : server config
 		 */
+		std::map<std::string, std::string>	_globalConfig;
+
 		std::map<std::string, std::string> _configMap;
 
 		std::map<std::string, std::string> _locationConfigMap;

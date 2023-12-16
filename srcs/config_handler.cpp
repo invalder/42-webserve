@@ -467,7 +467,6 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string& filename)
 		}
 
 		if (!insideServer && !insideHttp) {
-			std::cout << "TEST == |" << line << "|" << std::endl;
 			parseGlobalConfig(line, _globalConfig);
 		}
 

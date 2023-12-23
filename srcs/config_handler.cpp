@@ -29,7 +29,7 @@ static inline int	splitKeyValue(std::string line, std::string &key, std::string 
 
 	// find tab first, if no tab --> find space
 	size_t	spacePos = line.find("\t");
-	
+
 	if (spacePos == std::string::npos) {
 		spacePos = line.find(" ");
 		if (spacePos == std::string::npos) {
@@ -98,7 +98,7 @@ void	parseLocationConfig(std::ifstream &file, Server *currentServer, std::string
 	// get location path from first line
 	line = line.substr(0, line.length() - 1);
 	line = line.substr(9, line.length() - 10);
-	
+
 	Location	toAddLoc;
 	toAddLoc.path = line;
 
@@ -106,7 +106,7 @@ void	parseLocationConfig(std::ifstream &file, Server *currentServer, std::string
 	while (getline(file, line)) {
 		if (line.find("}") != std::string::npos)
 			break ;
-		
+
 		if (line.find("cgi") != std::string::npos && line.find("{") != std::string::npos) {
 			// add cgi to current location
 			parseAddMap(file, toAddLoc.cgi);
@@ -380,6 +380,76 @@ Server* matchRequestToServer(const t_HttpRequest& request, const std::vector<Ser
 	return 0; // No matching server found
 }
 
+const Location* matchRequestToLocation(const t_HttpRequest& request, Server* server) {
+	// Check for null server pointer
+	if (server == NULL) {
+		std::cerr << "Server is null" << std::endl;
+		return NULL;
+	}
+
+	const std::string& requestedPath = request.path;
+	std::cerr << "Requested path: " << requestedPath << std::endl;
+
+	// Iterate through locations to find a match
+	for (std::vector<Location>::const_iterator it = server->locations.begin(); it != server->locations.end(); ++it) {
+		const Location& location = *it;
+
+		// Check if the requested path starts with the location path
+		if (requestedPath == location.path) {
+			// Found a matching location
+			// Return the address of the location in the vector
+			// std::cerr << "requestedPath: " << requestedPath << std::endl;
+			// std::cerr << "Found matching location: " << location.path << std::endl;
+			return &(*it);
+		}
+	}
+
+	// No matching location found
+	// std::cerr << "No matching location found" << std::endl;
+	return 0;
+}
+
+std::string readHtmlFile(const std::string& filePath) {
+
+	std::cerr << "Read HTML file path: " << filePath << std::endl;
+
+	std::ifstream htmlFile(filePath.c_str());
+	std::ostringstream buffer;
+	buffer << htmlFile.rdbuf();
+
+	std::cerr << "Read HTML file: " << buffer.str() << std::endl;
+
+	return buffer.str();
+}
+
+std::string getHttpStatusString(int statusCode) {
+	switch (statusCode) {
+		case 200: return "OK";
+		case 201: return "Created";
+		case 202: return "Accepted";
+		case 204: return "No Content";
+		case 400: return "Bad Request";
+		case 401: return "Unauthorized";
+		case 403: return "Forbidden";
+		case 404: return "Not Found";
+		case 405: return "Method Not Allowed";
+		case 500: return "Internal Server Error";
+		case 501: return "Not Implemented";
+		case 502: return "Bad Gateway";
+		case 503: return "Service Unavailable";
+		// Add more cases for other status codes
+		default: return "Unknown Status";
+	}
+}
+
+std::string createHtmlResponse(int statusCode, const std::string& htmlContent) {
+	std::ostringstream response;
+	response << "HTTP/1.1 " << statusCode << " " << getHttpStatusString(statusCode) << "\r\n"
+				<< "Content-Type: text/html\r\n"
+				<< "Content-Length: " << htmlContent.length() << "\r\n\r\n"
+				<< htmlContent;
+	return response.str();
+}
 
 
 /**
@@ -611,13 +681,39 @@ void ConfigHandler::execute() const {
 					// check host and path
 					t_HttpRequest request = parseHttpRequest(requestString);
 
+					// print request
+					// std::cout << "------------------ Request headers ------------------" << std::endl;
+					// std::cout << "Request method: " << request.method << std::endl;
+					// std::cout << "Request path: " << request.path << std::endl;
+					// std::cout << "Request HTTP version: " << request.httpVersion << std::endl;
+					// std::cout << "Request body: " << request.body << std::endl;
+					// std::cout << "------------------ Request headers ------------------" << std::endl;
+
+
 					Server* matchedServer = matchRequestToServer(request, _httpConfig.servers);
 					if (matchedServer) {
 						std::cout << "Matched server" << std::endl;
-						response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
+						// response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
+						const Location* matchedLocation = matchRequestToLocation(request, matchedServer);
+						if (matchedLocation) {
+							std::cout << "Matched location" << std::endl;
+							std::map<std::string, std::string>::const_iterator rootDirective = matchedLocation->directives.find("root");
+							std::map<std::string, std::string>::const_iterator defaultFile = matchedLocation->directives.find("default_file");
+
+							if (rootDirective == matchedLocation->directives.end()) {
+								rootDirective = matchedServer->directives.find("root");
+							}
+							response = createHtmlResponse(200, readHtmlFile(rootDirective->second + "/" + defaultFile->second));
+						} else {
+							std::cout << "No matching location found" << std::endl;
+							// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
+							response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+						}
+
 					} else {
 						std::cout << "No matching server found" << std::endl;
-						response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
+						// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
+						response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
 					}
 
 					send(*it, response.c_str(), response.length(), 0);

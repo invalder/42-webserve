@@ -23,6 +23,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 
 typedef struct s_HttpRequset
 {
@@ -36,7 +37,7 @@ typedef struct s_HttpRequset
 class Location {
 	public:
 		std::string path;
-		std::map<std::string, std::string> directives;
+		std::map<std::string, std::string>	directives;
 
 		std::map<std::string, std::string>	cgi;
 		std::map<std::string, std::string>	upload;
@@ -79,6 +80,8 @@ class ConfigHandler
 {
 	private:
 		std::string _data;
+
+		mutable std::vector<int> _boundPorts;
 
 		/**
 		 * @brief map to save config data
@@ -129,6 +132,12 @@ class ConfigHandler
 
 		// ===== ForTest Remove Bofore Push =====
 		void	testPrintAll() const;
+
+		bool	checkFileExist( std::string ) const;
+		bool	checkImageFile( std::string ) const;
+
+		static void	signalHandler( int );
+		void	closePorts() const;
 
 	// exceptions
 	// file open exception

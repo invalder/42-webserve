@@ -29,7 +29,11 @@ int	main (int argc, char **argv)
 		// configHandler.execute();
 	} else {
 		std::cerr << "Parameters are more than 2" << std::endl;
+
 	}
+
+	// TODO: handle SIGTERM, SIGINT, SIGQUIT
+	// when signal is received, close all sockets and exit
 
 	return 0;
 }

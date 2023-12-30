@@ -889,7 +889,7 @@ void ConfigHandler::execute() const
 					// std::cout << "Request method: " << request.method << std::endl;
 					// std::cout << "Request path: " << request.path << std::endl;
 					// std::cout << "Request HTTP version: " << request.httpVersion << std::endl;
-					// std::cout << "Request body: " << request.body << std::endl;
+					 std::cout << "Request body: " << request.body << std::endl;
 					// std::cout << "------------------ Request headers ------------------" << std::endl;
 
 					Server *matchedServer = matchRequestToServer(request, _httpConfig.servers);
@@ -956,7 +956,7 @@ void ConfigHandler::execute() const
 							}
 
 							if (!isMethodMatch) {
-								response = createHtmlResponse(405, readHtmlFile("/Users/rubii/42/cursus/webserve/github/htdocs/error/405.html"));
+								response = createHtmlResponse(405, readHtmlFile("/Users/palmicid/Documents/projects/42-webserve/htdocs/error/405.html"));
 							} else {
 								// handle cgi
 								std::map<std::string, std::string>::const_iterator cgiDirective = matchedLocation->cgi.find("cgi");
@@ -1016,7 +1016,7 @@ void ConfigHandler::execute() const
 							}
 
 							
-							exit(0);
+							// exit(0);
 							// - check cgi
 						} else {
 							std::cout << "No matching location found" << std::endl;
@@ -1041,13 +1041,13 @@ void ConfigHandler::execute() const
 								else
 								{
 									// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
-									response = createHtmlResponse(404, readHtmlFile("/Users/rubii/42/cursus/webserve/github/htdocs/error/404.html"));
+									response = createHtmlResponse(404, readHtmlFile("/Users/palmicid/Documents/projects/42-webserve/htdocs/error/404.html"));
 								}
 							}
 							else
 							{
 								// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
-								response = createHtmlResponse(404, readHtmlFile("/Users/rubii/42/cursus/webserve/github/htdocs/error/404.html"));
+								response = createHtmlResponse(404, readHtmlFile("/Users/palmicid/Documents/projects/42-webserve/htdocs/error/404.html"));
 							}
 						}
 					}
@@ -1057,14 +1057,14 @@ void ConfigHandler::execute() const
 
 						if (request.path.find(".png") != std::string::npos)
 						{
-							response = createHtmlResponse(200, readHtmlFile("/Users/rubii/42/cursus/webserve/github/htdocs/error/404_error_page.png"));
+							response = createHtmlResponse(200, readHtmlFile("/Users/palmicid/Documents/projects/42-webserve/htdocs/error/404_error_page.png"));
 						}
 						else
 						{
-							response = createHtmlResponse(404, readHtmlFile("/Users/rubii/42/cursus/webserve/github/htdocs/error/404.html"));
+							response = createHtmlResponse(404, readHtmlFile("/Users/palmicid/Documents/projects/42-webserve/htdocs/error/404.html"));
 						}
 						// // response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
-						// response = createHtmlResponse(404, readHtmlFile("/Users/rubii/42/cursus/webserve/github/htdocs/error/404.html"));
+						// response = createHtmlResponse(404, readHtmlFile("/Users/palmicid/Documents/projects/42-webserve/htdocs/error/404.html"));
 					}
 
 					send(*it, response.c_str(), response.length(), 0);

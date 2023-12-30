@@ -1,6 +1,18 @@
 #include <iostream>
 #include "config_handler.hpp"
 
+// TODO
+/*
+	- all method
+	- parser http request (divide 2 part)
+		|- body
+		|- header --> field, size, servername
+	- other limit detail
+		|- size ,server name
+		|- when restart server disable some method but it still in the http file
+
+*/
+
 int	main (int argc, char **argv)
 {
 	if (argc <= 2)

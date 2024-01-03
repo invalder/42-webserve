@@ -1,20 +1,83 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Index Page</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>webser</title>
 </head>
 <body>
-    <h1>Welcome to Index Page!</h1>
-	<form action="/" method="post">
-		<input type="number" name="WOWWWWWWWWWWWWWW">
-		<input type="text" name="sometext">
-		<input type="email" name="emailllll">
-		<button type="submit">submit</button>
+	<h1>Webser</h1>
+	<h5>for test post</h5>
+	<form>
+		<input type="file" name="file" id="file">
+		<button type="submit" id="submitUpload">submit</button>
 	</form>
+	<br>
+	<hr>
+	<br>
+	<h5>for test delete</h5>
+	<form>
+		<input type="text" name="namefile" id="namefileDelete">
+		<button type="submit" id="submitDelete">submit</button>
+	</form>
+	<br>
+	<hr>
+	<br>
+	<h5>for test download</h5>
+	<input type="text" name="namefile" id="namefileDownload">
+	<button id="setFileName">set file name</button>
+	<a id="buttonDownload">download file</a>
 
-	<form action="/" method="post" enctype="multipart/form-data">
-        <input type="file" name="uploadfile"> <!-- Added line for file upload -->
-        <button type="submit">submit</button>
-    </form>
+    <!-- script -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script> <!-- cdn axios -->
+    <script>
+		const local_host = window.location.host;
+
+		const submitUpload = document.getElementById("submitUpload");
+
+		submitUpload.addEventListener("click", (e) => {
+			e.preventDefault(); // not refresh page
+			let formData = new FormData();
+			let fileField = document.querySelector("input[type='file']");
+			formData.append("file", fileField.files[0]);
+
+			axios.request({
+				method: "POST",
+				url: `http://${local_host}/upload/`,
+				data: formData,
+				headers: {
+					"Content-Type": "multipart/form-data",
+				},
+			}).then(function (response) {
+				console.log(response.data);
+			}).catch(function (error) {
+				console.log(error);
+			});
+		});
+
+		const submitDelete = document.getElementById("submitDelete");
+		const namefileDelete = document.getElementById("namefileDelete");
+
+		submitDelete.addEventListener("click", (e) => {
+			e.preventDefault(); // not refresh page
+
+		axios.request({
+				method: "DELETE",
+				url: `http://${local_host}/upload/?file=${namefileDelete.value}`,
+			}).then(function (response) {
+				console.log(response.data);
+			}).catch(function (error) {
+				console.log(error);
+			});
+		});
+
+		const setFileName = document.getElementById("setFileName");
+		const namefileDownload = document.getElementById("namefileDownload");
+		const buttonDownload = document.getElementById("buttonDownload");
+
+		setFileName.addEventListener("click", (e) => {
+			buttonDownload.href = `http://${local_host}/upload/?file=${namefileDownload.value}`;
+		});
+	</script>
 </body>
 </html>

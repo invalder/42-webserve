@@ -528,6 +528,12 @@ std::string createHtmlResponse(int statusCode, const std::string &htmlContent)
 	return response.str();
 }
 
+std::string formatSize(size_t size) {
+	std::ostringstream stream; // Declaring an ostringstream object
+	stream << size << " bytes"; // Using the insertion operator to format the string
+	return stream.str(); // Returning the formatted string
+}
+
 /**
  * @brief Get file stream from file name
  * 	Steps:
@@ -964,8 +970,6 @@ void ConfigHandler::execute() const
 											}
 											else
 											{
-												std::cerr << "\033[1;31m" << "Che" << "\033[0m" << std::endl;
-
 												// check if auto index is on
 												std::map<std::string, std::string>::const_iterator autoIndexDirective = matchedLocation->directives.find("autoindex");
 
@@ -974,19 +978,40 @@ void ConfigHandler::execute() const
 													// auto index is on
 													std::cerr << "\033[1;31m" << "Auto index is on" << "\033[0m" << std::endl;
 
-													// get all files in directory
 													DIR *dir;
 													struct dirent *ent;
-													if ((dir = opendir (filePath.c_str())) != NULL) {
-														/* print all the files and directories within directory */
-														while ((ent = readdir (dir)) != NULL) {
-															std::cout << ent->d_name << std::endl;
+													struct stat fileInfo;
+													std::string fullPath;
+													char timeBuff[20];
+													std::string responseTemp = "<html>\n<head>\n<title>Directory Listing</title>\n</head>\n<body>\n<h1>Index Of ";
+													responseTemp += request.path;
+													responseTemp += "</h1>\n<table>\n<tr><th>Name</th><th>Last Modified</th><th>Size</th></tr>\n";
+
+													dir = opendir(filePath.c_str());
+													if (dir != NULL) {
+														while ((ent = readdir(dir)) != NULL) {
+															fullPath = filePath + "/" + ent->d_name;
+
+															if(stat(fullPath.c_str(), &fileInfo) == 0) {
+																std::strftime(timeBuff, 20, "%Y-%m-%d %H:%M:%S", std::localtime(&fileInfo.st_mtime));
+
+																responseTemp += "<tr><td><a href=\"";
+																responseTemp += request.path + "/" + ent->d_name;
+																responseTemp += "\">";
+																responseTemp += ent->d_name;
+																responseTemp += "</a></td><td>";
+																responseTemp += timeBuff;
+																responseTemp += "</td><td>";
+																responseTemp += formatSize(fileInfo.st_size);
+																responseTemp += "</td></tr>\n";
+															}
 														}
-														closedir (dir);
+														closedir(dir);
+														responseTemp += "</table>\n</body>\n</html>";
+														response = createHtmlResponse(200, responseTemp);
 													} else {
-														/* could not open directory */
-														perror ("");
-														exit (EXIT_FAILURE);
+														std::cerr << "Error opening directory: " << filePath << std::endl;
+														response = createHtmlResponse(404, "Not Found");
 													}
 												}
 												else

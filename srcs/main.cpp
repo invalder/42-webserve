@@ -27,11 +27,13 @@ int	main (int argc, char **argv)
 
 			configHandler.bindAndSetSocketOptions();
 			configHandler.execute();
+
+			return (EXIT_SUCCESS);
 		} catch (std::exception &e) {
 			std::cerr << e.what() << std::endl;
 		}
 		// ConfigHandler configHandler = ConfigHandler( fileName );
- 
+
 		// configHandler.printData();
 		// configHandler.printServerDirectives();
 
@@ -41,7 +43,7 @@ int	main (int argc, char **argv)
 		// configHandler.execute();
 	} else {
 		std::cerr << "Parameters are more than 2" << std::endl;
-
+		return (EXIT_FAILURE);
 	}
 
 	// TODO: handle SIGTERM, SIGINT, SIGQUIT

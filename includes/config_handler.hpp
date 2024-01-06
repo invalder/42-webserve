@@ -20,10 +20,12 @@
 #include <sys/select.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <dirent.h>
 
 typedef struct s_HttpRequset
 {

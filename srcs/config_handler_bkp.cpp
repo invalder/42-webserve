@@ -144,11 +144,6 @@ void parseLocationConfig(std::ifstream &file, Server *currentServer, std::string
 
 			if (!key.empty() && !value.empty())
 			{
-				// remove "[", "]", and "," from value
-				value.erase(std::remove(value.begin(), value.end(), '['), value.end());
-				value.erase(std::remove(value.begin(), value.end(), ']'), value.end());
-				value.erase(std::remove(value.begin(), value.end(), ','), value.end());
-
 				toAddLoc.directives[key] = value;
 			}
 		}
@@ -875,182 +870,251 @@ void ConfigHandler::execute() const
 			{
 				char buffer[4096];
 				ssize_t bytesReceived = recv(*it, buffer, sizeof(buffer), 0);
+
+				// std::cout << "Received " << bytesReceived << " bytes" << std::endl;
+				// std::cout << "Buffer: " << buffer << std::endl;
+
 				if (bytesReceived > 0)
 				{
 					// Process the data
+					// std::string response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
+					// send(*it, response.c_str(), response.length(), 0);
 					std::string response = "";
 					std::string requestString(buffer, bytesReceived);
 					// check host and path
 					t_HttpRequest request = parseHttpRequest(requestString);
+
+					// print request
+					// std::cout << "------------------ Request headers ------------------" << std::endl;
+					// std::cout << "Request method: " << request.method << std::endl;
+					// std::cout << "Request path: " << request.path << std::endl;
+					// std::cout << "Request HTTP version: " << request.httpVersion << std::endl;
+					// std::cout << "Request body: " << request.body << std::endl;
+					// std::cout << "------------------ Request headers ------------------" << std::endl;
+
 					Server *matchedServer = matchRequestToServer(request, _httpConfig.servers);
+
+					// // print matched server in RED
+					// std::cout << "\033[1;31m" << "Matched server: " << matchedServer << "\033[0m" << std::endl;
 
 					if (matchedServer)
 					{
-						// std::cout << "\033[1;31m" << "Matched server: " << matchedServer << "\033[0m" << std::endl;
-
+						std::cout << "Matched server" << std::endl;
+						// response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
 						const Location *matchedLocation = matchRequestToLocation(request, matchedServer);
 						if (matchedLocation)
 						{
 							std::cout << "Matched location" << std::endl;
+							std::map<std::string, std::string>::const_iterator rootDirective = matchedLocation->directives.find("root");
+							std::map<std::string, std::string>::const_iterator defaultFile = matchedLocation->directives.find("default_file");
 
-							// check if method is allowed
-							std::map<std::string, std::string>::const_iterator allowedMethod = matchedLocation->directives.find("methods");
-
-							if (allowedMethod != matchedLocation->directives.end())
+							if (rootDirective == matchedLocation->directives.end())
 							{
-								// check if request method is allowed
-								std::cout << "Method: " << request.method << std::endl;
+								rootDirective = matchedServer->directives.find("root");
+							}
 
-								bool methodAllowed = false;
+							response = createHtmlResponse(200, readHtmlFile(rootDirective->second + "/" + defaultFile->second));
 
-								// print all Allowed Methods
-								std::istringstream iss(allowedMethod->second);
-								std::string method;
-								while (iss >> method)
+							// TODO:
+							// - check method
+							// get method from request
+							const std::string &method = request.method;
+
+							// get method from location
+							std::map<std::string, std::string>::const_iterator methodDirective = matchedLocation->directives.find("methods");
+
+
+							// convert method directive value to vector
+							std::string methodDirectiveValue = methodDirective->second;
+							// trim [ and ]
+							methodDirectiveValue = methodDirectiveValue.substr(1, methodDirectiveValue.length() - 2);
+							std::vector<std::string> methods;
+							std::istringstream iss(methodDirectiveValue);
+							std::string methodStr;
+
+							// put method to vector
+							while (iss >> methodStr) {
+								// trim comma from method string
+								methodStr.erase(std::remove(methodStr.begin(), methodStr.end(), ','), methodStr.end());
+								methods.push_back(methodStr);
+							}
+
+							// check if method from request is in method vector
+							bool isMethodMatch = false;
+							for (std::vector<std::string>::iterator it = methods.begin(); it != methods.end(); ++it) {
+								if (*it == method)
 								{
-									std::cout << "Allowed method: " << method << std::endl;
-									if (method == request.method)
-									{
-										methodAllowed = true;
-										break;
-									}
+									isMethodMatch = true;
+									break;
 								}
+							}
 
-								if (!methodAllowed)
+							// TODO: Remove this
+							for (std::vector<std::string>::iterator it = methods.begin(); it != methods.end(); ++it)
+							{
+								std::cout << "Method: " << *it << std::endl;
+							}
+
+							if (!isMethodMatch) {
+								response = createHtmlResponse(405, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/405.html"));
+							} else {
+								// handle cgi
+								std::map<std::string, std::string>::const_iterator cgiDirective = matchedLocation->cgi.find("cgi");
+								// print cgi directive
+								std::cout << "CGI directive: " << cgiDirective->second << std::endl;
+								// if cgi directive is not empty
+								if (!cgiDirective->second.empty()) {
+									// get cgi path
+									std::string cgiPath = cgiDirective->second;
+									// get cgi path extension
+									std::string cgiPathExtension = cgiPath.substr(cgiPath.find_last_of(".") + 1);
+									std::cout << "CGI path extension: " << cgiPathExtension << std::endl;
+								}
+								else {
+									// find cgi directive in other location that matched with default file
+									// get default file
+									std::string defaultFile = matchedLocation->directives.find("default_file")->second;
+									std::cout << "Default file: " << defaultFile << std::endl;
+									// loop to find location in matched server that matched with default file
+									for (std::vector<Location>::const_iterator it = matchedServer->locations.begin(); it != matchedServer->locations.end(); ++it)
+									{
+										const Location &location = *(++it);
+										std::cout << "Location path: " << location.path << std::endl;
+										// get default file from location
+										std::string locationDefaultFile = location.directives.find("default_file")->second;
+										// trim / at the beginning of default file
+										locationDefaultFile = locationDefaultFile.substr(0, locationDefaultFile.length());
+										std::cout << "Location default file: " << locationDefaultFile << std::endl;
+
+										if (defaultFile == locationDefaultFile) {
+											// get cgi map
+											std::map<std::string, std::string>cgi = location.cgi;
+											// print cgi map
+											std::cout << "CGI map: " << std::endl;
+											for (std::map<std::string, std::string>::iterator it = cgi.begin(); it != cgi.end(); ++it)
+											{
+												std::cout << it->first << " => " << it->second << '\n';
+											}
+											// get cgi
+										}
+									}
+									// for (std::vector<Location>::const_iterator it = matchedServer->locations.begin()->directives; it != server->locations.end(); ++it)
+									// {
+									// 	const Location &location = *it;
+
+									// 	// Check if the requested path starts with the location path
+									// 	if (requestedPath == location.path)
+									// 	{
+									// 		// Found a matching location
+									// 		// Return the address of the location in the vector
+									// 		// std::cerr << "requestedPath: " << requestedPath << std::endl;
+									// 		// std::cerr << "Found matching location: " << location.path << std::endl;
+									// 		return &(*it);
+									// 	}
+									// }
+								}
+							}
+
+
+							// exit(0);
+							// - check cgi
+						} else {
+							std::cout << "No matching location found" << std::endl;
+
+							std::cerr << "Request path: " << request.path << std::endl;
+							// To check if reuest path is upload or cgi
+							// check if request path is upload
+							if (request.path.find("/upload") != std::string::npos)
+							{
+								// construct absolute path for file
+								// looking for the file from request path and get the file name
+								// Find the start of the query string
+								std::string::size_type query_start = request.path.find("?") + 1;
+
+								// Extract the query string
+								std::string query_string = request.path.substr(query_start);
+
+								// Find the start of the "file" parameter value
+								std::string::size_type file_start = query_string.find("=") + 1;
+
+								// Extract the "file" parameter value
+								std::string file_value = query_string.substr(file_start);
+
+								// Remove This
+								std::cout << "File value: " << file_value << std::endl;
+
+								std::string path = matchedServer->directives["root"] + "/upload/" + file_value;
+
+								// Remove
+								std::cout << "Path: " << path << std::endl;
+
+								// check if file exist
+								bool fileExist = checkFileExist(path);
+
+								if (fileExist)
 								{
-									std::cerr << "Method not allowed" << std::endl;
-									response = createHtmlResponse(405, "Method not allowed");
+									// construct response with image file
+									response = createHtmlResponse(200, readHtmlFile(path));
 								}
 								else
 								{
-									// check if file exist
-									std::map<std::string, std::string>::const_iterator rootDirective = matchedLocation->directives.find("root");
-									std::map<std::string, std::string>::const_iterator defaultFile = matchedLocation->directives.find("default_file");
-
-									if (rootDirective == matchedLocation->directives.end())
-									{
-										rootDirective = matchedServer->directives.find("root");
-									}
-
-									std::string filePath = rootDirective->second + request.path;
-									std::cerr << "File path: " << filePath << std::endl;
-
-									// check if directory or file
-									struct stat s;
-									if (stat(filePath.c_str(), &s) == 0)
-									{
-										if (s.st_mode & S_IFDIR)
-										{
-											// it's a directory
-
-											// check if default file exist
-											if (defaultFile != matchedLocation->directives.end())
-											{
-												filePath = rootDirective->second + "/" + defaultFile->second;
-												std::cerr << "\033[1;31m" << "Default file path: " << filePath << "\033[0m" << std::endl;
-
-												if (checkFileExist(filePath))
-												{
-													std::cerr<< "\033[1;31m" << "Default file exist" << "\033[0m" << std::endl;
-
-													response = createHtmlResponse(200, readHtmlFile(filePath));
-												}
-												else
-												{
-													std::cerr << "\033[1;31m" << "Default file not exist" << "\033[0m" << std::endl;
-
-													response = createHtmlResponse(404, "File not found");
-												}
-											}
-											else
-											{
-												std::cerr << "\033[1;31m" << "Che" << "\033[0m" << std::endl;
-
-												// check if auto index is on
-												std::map<std::string, std::string>::const_iterator autoIndexDirective = matchedLocation->directives.find("autoindex");
-
-												if (autoIndexDirective != matchedLocation->directives.end())
-												{
-													// auto index is on
-													std::cerr << "\033[1;31m" << "Auto index is on" << "\033[0m" << std::endl;
-
-													// get all files in directory
-													DIR *dir;
-													struct dirent *ent;
-													if ((dir = opendir (filePath.c_str())) != NULL) {
-														/* print all the files and directories within directory */
-														while ((ent = readdir (dir)) != NULL) {
-															std::cout << ent->d_name << std::endl;
-														}
-														closedir (dir);
-													} else {
-														/* could not open directory */
-														perror ("");
-														exit (EXIT_FAILURE);
-													}
-												}
-												else
-												{
-													// auto index is off
-													std::cerr << "\033[1;31m" << "Auto index is off" << "\033[0m" << std::endl;
-
-													response = createHtmlResponse(404, "File not found");
-												}
-											}
-										}
-										else if (s.st_mode & S_IFREG)
-										{
-											// it's a file
-											if (checkFileExist(filePath))
-											{
-												std::cerr << "\033[1;31m" << "File exist" << "\033[0m" << std::endl;
-
-												response = createHtmlResponse(200, readHtmlFile(filePath));
-											}
-											else
-											{
-												std::cerr << "\033[1;31m" << "File not exist" << "\033[0m" << std::endl;
-
-												response = createHtmlResponse(404, "File not found");
-											}
-										}
-										else
-										{
-											// something else
-										}
-									}
-									else
-									{
-										// error
-										std::cerr << "\033[1;31m" << "File not exist" << "\033[0m" << std::endl;
-
-										response = createHtmlResponse(404, "File not found");
-									}
+									// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
+									response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
 								}
 							}
-						}
-						else
-						{
-							std::cout << "No matching location found" << std::endl;
+							else
+							{
+								// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
+								response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+							}
 
-							response = createHtmlResponse(404, "File not found");
-							// check if cgi
-							// std::map<std::string, std::string>::const_iterator cgiDirective = matchedServer->directives.find("cgi");
+
+							// TODO: handle image file
+							// check if request path is image file by checking extension
+							bool isImageFile = checkImageFile(request.path);
+
+							if (isImageFile)
+							{
+								// construct absolute path for file
+								std::string path = matchedServer->directives["root"] + "/error" + request.path;
+
+								// check if file exist
+								bool fileExist = checkFileExist(path);
+
+								if (fileExist)
+								{
+									// construct response with image file
+									response = createHtmlResponse(200, readHtmlFile(path));
+								}
+								else
+								{
+									// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
+									response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+								}
+							}
+							else
+							{
+								// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
+								response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+							}
 						}
 					}
 					else
 					{
-						std::cerr << "No matching server found" << std::endl;
+						std::cout << "No matching server found" << std::endl;
 
-						// if (request.path.find(".png") != std::string::npos)
-						// {
-						// 	response = createHtmlResponse(200, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404_error_page.png"));
-						// }
-						// else
-						// {
-						// 	response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
-						// }
+						if (request.path.find(".png") != std::string::npos)
+						{
+							response = createHtmlResponse(200, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404_error_page.png"));
+						}
+						else
+						{
+							response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+						}
+						// // response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
+						// response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
 					}
+
 					send(*it, response.c_str(), response.length(), 0);
 				}
 				else if (bytesReceived == 0)

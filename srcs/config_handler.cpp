@@ -1,5 +1,7 @@
 #include "config_handler.hpp"
 
+extern char **environ;
+
 // Helper functions to trim whitespace
 static inline std::string &ltrim(std::string &s)
 {
@@ -39,7 +41,7 @@ static inline int splitKeyValue(std::string line, std::string &key, std::string 
 		spacePos = line.find(" ");
 		if (spacePos == std::string::npos)
 		{
-			std::cerr << "Not Valid spacePos: " << std::endl;
+			std::cerr << DEBUG_MSG << "Not Valid spacePos: " << std::endl;
 			return 1;
 		}
 	}
@@ -232,7 +234,7 @@ void parseServerDirectives(std::string line, Server *currentServer)
 	if (semicolonPos == std::string::npos || semicolonPos == 0)
 	{
 		// Not a valid directive line
-		std::cerr << "Not Valid semicolonPos: " << std::endl;
+		std::cerr << DEBUG_MSG << "Not Valid semicolonPos: " << std::endl;
 		return;
 	}
 
@@ -246,7 +248,7 @@ void parseServerDirectives(std::string line, Server *currentServer)
 	if (spacePos == std::string::npos)
 	{
 		// No space found, so it's not a key-value pair
-		std::cerr << "Not Valid spacePos: " << std::endl;
+		std::cerr << DEBUG_MSG << "Not Valid spacePos: " << std::endl;
 		return;
 	}
 
@@ -395,7 +397,7 @@ Server *matchRequestToServer(const t_HttpRequest &request, const std::vector<Ser
 
 	// Find the "Host" header in a const-safe manner
 	std::map<std::string, std::string>::const_iterator itHost = request.headers.find("Host");
-	std::cout << "\033[1;31m" << "Request headers: " << itHost->first << ": " << itHost->second << "\033[0m" << std::endl;
+	std::cerr << "\033[1;31m" << DEBUG_MSG << "Request headers: " << itHost->first << ": " << itHost->second << "\033[0m" << std::endl;
 	if (itHost != request.headers.end())
 	{
 		requestedHost = itHost->second;
@@ -440,12 +442,12 @@ const Location *matchRequestToLocation(const t_HttpRequest &request, Server *ser
 	// Check for null server pointer
 	if (server == NULL)
 	{
-		std::cerr << "Server is null" << std::endl;
+		std::cerr << DEBUG_MSG << "Server is null" << std::endl;
 		return NULL;
 	}
 
 	const std::string &requestedPath = request.path;
-	std::cerr << "Requested path: " << requestedPath << std::endl;
+	std::cerr << DEBUG_MSG << "Requested path: " << requestedPath << std::endl;
 
 	// Iterate through locations to find a match
 	for (std::vector<Location>::const_iterator it = server->locations.begin(); it != server->locations.end(); ++it)
@@ -471,13 +473,13 @@ const Location *matchRequestToLocation(const t_HttpRequest &request, Server *ser
 std::string readHtmlFile(const std::string &filePath)
 {
 
-	std::cerr << "Read HTML file path: " << filePath << std::endl;
+	std::cerr << DEBUG_MSG << "Read HTML file path: " << filePath << std::endl;
 
 	std::ifstream htmlFile(filePath.c_str());
 	std::ostringstream buffer;
 	buffer << htmlFile.rdbuf();
 
-	std::cerr << "Read HTML file: " << buffer.str() << std::endl;
+	std::cerr << DEBUG_MSG << "Read HTML file: " << buffer.str() << std::endl;
 
 	return buffer.str();
 }
@@ -528,6 +530,62 @@ std::string createHtmlResponse(int statusCode, const std::string &htmlContent)
 	return response.str();
 }
 
+std::string getFileExtension(const std::string& filePath) {
+	std::string::size_type dotPos = filePath.find_last_of('.');
+	if(dotPos != std::string::npos && dotPos != filePath.length() - 1) {
+		return filePath.substr(dotPos + 1);
+	} else {
+		return "";
+	}
+}
+
+std::string detectMimeType(const std::string& extension) {
+	std::map<std::string, std::string> mimeTypes;
+	mimeTypes["html"] = "text/html";
+	mimeTypes["txt"] = "text/plain";
+	mimeTypes["jpg"] = "image/jpeg";
+	mimeTypes["jpeg"] = "image/jpeg";
+	mimeTypes["png"] = "image/png";
+	mimeTypes["pdf"] = "application/pdf";
+	// Add more mappings as needed
+
+	std::map<std::string, std::string>::const_iterator it = mimeTypes.find(extension);
+	if (it != mimeTypes.end()) {
+		return it->second;
+	} else {
+		return "application/octet-stream"; // default or unknown types
+	}
+}
+
+std::string createFileResponse(int statusCode, const std::string &filePath)
+{
+	std::string extension = getFileExtension(filePath);
+	std::string mimeType = detectMimeType(extension);
+
+	std::ifstream file(filePath.c_str(), std::ios::binary | std::ios::ate);
+	if(!file.is_open()) {
+		return "Error: Unable to open file";
+	}
+
+	std::streamsize size = file.tellg();
+	file.seekg(0, std::ios::beg);
+
+	std::vector<char> buffer(static_cast<size_t>(size));
+	if(file.read(&buffer[0], size))
+	{
+		std::ostringstream response;
+		response << "HTTP/1.1 " << statusCode << " " << getHttpStatusString(statusCode) << "\r\n"
+			<< "Content-Type: " << mimeType << "\r\n"
+			<< "Content-Length: " << size << "\r\n\r\n"
+			<< std::string(buffer.begin(), buffer.end());
+		return response.str();
+	}
+	else
+	{
+		return "Error: Unable to read file content";
+	}
+}
+
 std::string formatSize(size_t size) {
 	std::ostringstream stream; // Declaring an ostringstream object
 	stream << size << " bytes"; // Using the insertion operator to format the string
@@ -552,7 +610,7 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string &filename)
 	std::string extension = filename.substr(filename.find_last_of(".") + 1);
 	if (extension != "conf")
 	{
-		std::cerr << "Incorrect file extension" << std::endl;
+		std::cerr << DEBUG_MSG << "Incorrect file extension" << std::endl;
 		throw IncorrectExtensionException();
 	}
 
@@ -647,14 +705,14 @@ void ConfigHandler::printServerDirectives() const
 	// Loop over each server in the configuration
 	for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt)
 	{
-		// std::cout << "Server Name: " << serverIt->server_names << std::endl;
+		// std::cerr << "Server Name: " << serverIt->server_names << std::endl;
 		std::cerr << "-------------------------------------------" << std::endl;
 		// Now loop over the directives for this server
 		for (std::map<std::string, std::string>::const_iterator directiveIt = (*serverIt)->directives.begin(); directiveIt != (*serverIt)->directives.end(); ++directiveIt)
 		{
-			std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+			std::cerr << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
 		}
-		std::cout << std::endl; // Add a newline for readability between servers
+		std::cerr << std::endl; // Add a newline for readability between servers
 	}
 }
 
@@ -663,7 +721,7 @@ void ConfigHandler::printHTTPDirectives() const
 	// Loop over each directive in the configuration
 	for (std::map<std::string, std::string>::const_iterator directiveIt = _httpConfig.directives.begin(); directiveIt != _httpConfig.directives.end(); ++directiveIt)
 	{
-		std::cout << "HTTP Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+		std::cerr << DEBUG_MSG << "HTTP Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
 	}
 }
 
@@ -672,17 +730,17 @@ void ConfigHandler::bindAndSetSocketOptions() const
 	// Loop over each server in the configuration
 	for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt)
 	{
-		// std::cout << "Server Name: " << serverIt->server_names << std::endl;
+		// std::cerr << "Server Name: " << serverIt->server_names << std::endl;
 		std::cerr << "-------------------------------------------" << std::endl;
 		// Now loop over the directives for this server
 		for (std::map<std::string, std::string>::const_iterator directiveIt = (*serverIt)->directives.begin(); directiveIt != (*serverIt)->directives.end(); ++directiveIt)
 		{
-			std::cout << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
+			std::cerr << DEBUG_MSG << "Server Directive: " << directiveIt->first << " Value: " << directiveIt->second << std::endl;
 		}
 		(*serverIt)->listener = socket(AF_INET, SOCK_STREAM, 0);
 		if ((*serverIt)->listener < 0)
 		{
-			std::cerr << "Error creating socket" << std::endl;
+			std::cerr << DEBUG_MSG << "Error creating socket" << std::endl;
 			continue;
 		}
 
@@ -694,7 +752,7 @@ void ConfigHandler::bindAndSetSocketOptions() const
 		int flags = fcntl((*serverIt)->listener, F_GETFL, 0);
 		if (flags < 0)
 		{
-			std::cerr << "Error getting socket flags" << std::endl;
+			std::cerr << DEBUG_MSG << "Error getting socket flags" << std::endl;
 			continue;
 		}
 
@@ -704,7 +762,7 @@ void ConfigHandler::bindAndSetSocketOptions() const
 		timeout.tv_usec = 0;
 		if (setsockopt((*serverIt)->listener, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
 		{
-			std::cerr << "Error setting socket options" << std::endl;
+			std::cerr << DEBUG_MSG << "Error setting socket options" << std::endl;
 			continue;
 		}
 
@@ -713,7 +771,7 @@ void ConfigHandler::bindAndSetSocketOptions() const
 		int optval = 1;
 		if (setsockopt((*serverIt)->listener, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
 		{
-			std::cerr << "Error setting socket options" << std::endl;
+			std::cerr << DEBUG_MSG << "Error setting socket options" << std::endl;
 			continue;
 		}
 
@@ -723,17 +781,17 @@ void ConfigHandler::bindAndSetSocketOptions() const
 		(*serverIt)->addr.sin_addr.s_addr = htonl(INADDR_ANY);
 		if (bind((*serverIt)->listener, (struct sockaddr *)&(*serverIt)->addr, sizeof((*serverIt)->addr)) < 0)
 		{
-			std::cerr << "Error binding socket" << std::endl;
+			std::cerr << DEBUG_MSG << "Error binding socket" << std::endl;
 			continue;
 		}
 		// Listen on socket
 		if (listen((*serverIt)->listener, 1024) < 0)
 		{
-			std::cerr << "Error listening on socket" << std::endl;
+			std::cerr << DEBUG_MSG << "Error listening on socket" << std::endl;
 			continue;
 		}
-		std::cout << std::endl; // Add a newline for readability between servers
-		std::cout << "Listening on port " << (*serverIt)->directives["listen"] << std::endl;
+		std::cerr << std::endl; // Add a newline for readability between servers
+		std::cerr << DEBUG_MSG << "Listening on port " << (*serverIt)->directives["listen"] << std::endl;
 	}
 }
 
@@ -802,13 +860,13 @@ void ConfigHandler::closePorts() const
 void ConfigHandler::signalHandler(int signal)
 {
 	if (signal == SIGINT)
-		std::cerr << "Received SIGINT" << std::endl;
+		std::cerr << DEBUG_MSG << "Received SIGINT" << std::endl;
 	else if (signal == SIGTERM)
-		std::cerr << "Received SIGTERM" << std::endl;
+		std::cerr << DEBUG_MSG << "Received SIGTERM" << std::endl;
 	else if (signal == SIGQUIT)
-		std::cerr << "Received SIGQUIT" << std::endl;
+		std::cerr << DEBUG_MSG << "Received SIGQUIT" << std::endl;
 	else
-		std::cerr << "Received signal " << signal << std::endl;
+		std::cerr << DEBUG_MSG << "Received signal " << signal << std::endl;
 
 	// close all sockets
 	instance().closePorts();
@@ -823,7 +881,7 @@ void ConfigHandler::execute() const
 	signal(SIGTERM, signalHandler);
 	signal(SIGQUIT, signalHandler);
 
-	std::cout << "Executing config" << std::endl;
+	std::cerr << DEBUG_MSG << "Executing config" << std::endl;
 
 	fd_set readfds;
 	std::vector<int> activeSockets;
@@ -849,7 +907,7 @@ void ConfigHandler::execute() const
 		int activity = select(FD_SETSIZE, &readfds, NULL, NULL, NULL);
 		if (activity < 0)
 		{
-			std::cerr << "Error selecting" << std::endl;
+			std::cerr << DEBUG_MSG << "Error selecting" << std::endl;
 			continue;
 		}
 
@@ -861,7 +919,7 @@ void ConfigHandler::execute() const
 				int newSocket = accept((*serverIt)->listener, NULL, NULL);
 				if (newSocket < 0)
 				{
-					std::cerr << "Error accepting connection" << std::endl;
+					std::cerr << DEBUG_MSG << "Error accepting connection" << std::endl;
 					continue;
 				}
 
@@ -890,22 +948,25 @@ void ConfigHandler::execute() const
 					t_HttpRequest request = parseHttpRequest(requestString);
 					Server *matchedServer = matchRequestToServer(request, _httpConfig.servers);
 
+					// Matched Server
 					if (matchedServer)
 					{
-						// std::cout << "\033[1;31m" << "Matched server: " << matchedServer << "\033[0m" << std::endl;
+						// std::cerr << "\033[1;31m" << "Matched server: " << matchedServer << "\033[0m" << std::endl;
 
+						// If Server Matched, Check Location ...
 						const Location *matchedLocation = matchRequestToLocation(request, matchedServer);
 						if (matchedLocation)
 						{
-							std::cout << "Matched location" << std::endl;
+							std::cerr << DEBUG_MSG << "Matched location" << std::endl;
 
-							// check if method is allowed
+							// If Location Matched, Check Method ...
+							// Check if method is allowed
 							std::map<std::string, std::string>::const_iterator allowedMethod = matchedLocation->directives.find("methods");
 
 							if (allowedMethod != matchedLocation->directives.end())
 							{
 								// check if request method is allowed
-								std::cout << "Method: " << request.method << std::endl;
+								std::cerr << DEBUG_MSG << "Method: " << request.method << std::endl;
 
 								bool methodAllowed = false;
 
@@ -914,7 +975,7 @@ void ConfigHandler::execute() const
 								std::string method;
 								while (iss >> method)
 								{
-									std::cout << "Allowed method: " << method << std::endl;
+									// std::cerr << "Allowed method: " << method << std::endl;
 									if (method == request.method)
 									{
 										methodAllowed = true;
@@ -924,7 +985,7 @@ void ConfigHandler::execute() const
 
 								if (!methodAllowed)
 								{
-									std::cerr << "Method not allowed" << std::endl;
+									std::cerr << DEBUG_MSG << "Method not allowed" << std::endl;
 									response = createHtmlResponse(405, "Method not allowed");
 								}
 								else
@@ -939,7 +1000,7 @@ void ConfigHandler::execute() const
 									}
 
 									std::string filePath = rootDirective->second + request.path;
-									std::cerr << "File path: " << filePath << std::endl;
+									std::cerr << DEBUG_MSG << "File path: " << filePath << std::endl;
 
 									// check if directory or file
 									struct stat s;
@@ -953,17 +1014,17 @@ void ConfigHandler::execute() const
 											if (defaultFile != matchedLocation->directives.end())
 											{
 												filePath = rootDirective->second + "/" + defaultFile->second;
-												std::cerr << "\033[1;31m" << "Default file path: " << filePath << "\033[0m" << std::endl;
+												std::cerr << "\033[1;31m" << DEBUG_MSG << "Default file path: " << filePath << "\033[0m" << std::endl;
 
 												if (checkFileExist(filePath))
 												{
-													std::cerr<< "\033[1;31m" << "Default file exist" << "\033[0m" << std::endl;
+													std::cerr<< "\033[1;31m" << DEBUG_MSG << "Default file exist" << "\033[0m" << std::endl;
 
 													response = createHtmlResponse(200, readHtmlFile(filePath));
 												}
 												else
 												{
-													std::cerr << "\033[1;31m" << "Default file not exist" << "\033[0m" << std::endl;
+													std::cerr << "\033[1;31m" << DEBUG_MSG << "Default file not exist" << "\033[0m" << std::endl;
 
 													response = createHtmlResponse(404, "File not found");
 												}
@@ -976,7 +1037,7 @@ void ConfigHandler::execute() const
 												if (autoIndexDirective != matchedLocation->directives.end())
 												{
 													// auto index is on
-													std::cerr << "\033[1;31m" << "Auto index is on" << "\033[0m" << std::endl;
+													std::cerr << "\033[1;31m" << DEBUG_MSG << "Auto index is on" << "\033[0m" << std::endl;
 
 													DIR *dir;
 													struct dirent *ent;
@@ -1017,7 +1078,7 @@ void ConfigHandler::execute() const
 												else
 												{
 													// auto index is off
-													std::cerr << "\033[1;31m" << "Auto index is off" << "\033[0m" << std::endl;
+													std::cerr << "\033[1;31m" << DEBUG_MSG << "Auto index is off" << "\033[0m" << std::endl;
 
 													response = createHtmlResponse(404, "File not found");
 												}
@@ -1028,13 +1089,13 @@ void ConfigHandler::execute() const
 											// it's a file
 											if (checkFileExist(filePath))
 											{
-												std::cerr << "\033[1;31m" << "File exist" << "\033[0m" << std::endl;
+												std::cerr << "\033[1;31m" << DEBUG_MSG << "File exist 2" << "\033[0m" << std::endl;
 
 												response = createHtmlResponse(200, readHtmlFile(filePath));
 											}
 											else
 											{
-												std::cerr << "\033[1;31m" << "File not exist" << "\033[0m" << std::endl;
+												std::cerr << "\033[1;31m" << DEBUG_MSG << "File not exist" << "\033[0m" << std::endl;
 
 												response = createHtmlResponse(404, "File not found");
 											}
@@ -1047,7 +1108,7 @@ void ConfigHandler::execute() const
 									else
 									{
 										// error
-										std::cerr << "\033[1;31m" << "File not exist" << "\033[0m" << std::endl;
+										std::cerr << "\033[1;31m" << DEBUG_MSG << "File not exist" << "\033[0m" << std::endl;
 
 										response = createHtmlResponse(404, "File not found");
 									}
@@ -1056,16 +1117,145 @@ void ConfigHandler::execute() const
 						}
 						else
 						{
-							std::cout << "No matching location found" << std::endl;
+							std::cerr << DEBUG_MSG << "No matching location found" << std::endl;
+							std::cerr << DEBUG_MSG << "Checking CGI" << std::endl;
+							if (request.path.find(".py") != std::string::npos || request.path.find(".sh") != std::string::npos) {
+								std::cerr << DEBUG_MSG << "CGI found" << std::endl;
+							} else {
+								std::cerr << DEBUG_MSG << "CGI not found" << std::endl;
+								std::cerr << DEBUG_MSG << "Checking if File Existed" << std::endl;
 
-							response = createHtmlResponse(404, "File not found");
-							// check if cgi
-							// std::map<std::string, std::string>::const_iterator cgiDirective = matchedServer->directives.find("cgi");
+								std::map<std::string, std::string>::const_iterator rootDirective = matchedServer->directives.find("root");
+								std::string filePath = rootDirective->second + request.path;
+								std::cerr << DEBUG_MSG << "File path: " << filePath << std::endl;
+
+								if (checkFileExist(filePath))
+								{
+									std::cerr << "\033[1;31m" << DEBUG_MSG << "File exist 3" << "\033[0m" << std::endl;
+
+									// response = createHtmlResponse(200, readHtmlFile(filePath));
+									response = createFileResponse(200, filePath);
+								}
+								else
+								{
+									std::cerr << "\033[1;31m" << DEBUG_MSG << "File not exist" << "\033[0m" << std::endl;
+
+									response = createHtmlResponse(404, "File not found");
+								}
+							}
+
+								// // check if cgi
+								// // check if file exist (.py and .sh)
+								// std::cerr << DEBUG_MSG << "Checking CGI" << std::endl;
+								// if (request.path.find(".py") != std::string::npos || request.path.find(".sh") != std::string::npos)
+								// {
+								// 	std::cerr << DEBUG_MSG << "CGI found" << std::endl;
+
+								// 	// Get the root directory from server configuration
+								// 	std::map<std::string, std::string>::const_iterator rootDirective = matchedServer->directives.find("root");
+								// 	if (rootDirective != matchedServer->directives.end()) {
+								// 	std::string filePath = rootDirective->second + request.path;
+
+								// 	std::cerr << DEBUG_MSG << "File path: " << filePath << std::endl;
+
+								// 	// Check if the CGI script exists
+								// 	if (checkFileExist(filePath)) {
+								// 		std::cerr << DEBUG_MSG << "File exists, executing CGI" << std::endl;
+
+								// 		// Set up pipes for communication
+								// 		int pipeCgi[2];
+								// 		pipe(pipeCgi);
+
+								// 		pid_t pid = fork();
+								// 		if (pid == 0) {
+								// 			// Child process
+
+								// 			// Close the read end of the pipe, it's not needed
+								// 			close(pipeCgi[0]);
+
+								// 			// Redirect stdout to the write end of the pipe
+								// 			dup2(pipeCgi[1], STDOUT_FILENO);
+
+								// 			// Construct the argument array for execve
+								// 			char *args[] = { const_cast<char *>(filePath.c_str()), NULL };
+
+								// 			// Execute the CGI script
+								// 			execve(args[0], args, environ);
+
+								// 			// Exit the child process when done
+								// 			exit(0);
+								// 		} else if (pid > 0) {
+								// 			// Parent process
+
+								// 			// Close the write end of the pipe, it's not needed
+								// 			close(pipeCgi[1]);
+
+								// 			// Read from the pipe
+								// 			char buffer[4096];
+								// 			std::string output;
+								// 			ssize_t bytesRead;
+
+								// 			while ((bytesRead = read(pipeCgi[0], buffer, sizeof(buffer) - 1)) > 0) {
+								// 				buffer[bytesRead] = '\0';  // Null-terminate the buffer
+								// 				output += buffer;
+								// 			}
+
+								// 			// Close the read end of the pipe
+								// 			close(pipeCgi[0]);
+
+								// 			// Wait for the child process to finish
+								// 			waitpid(pid, NULL, 0);
+
+								// 			// Create the response with the output of the CGI script
+								// 			response = createHtmlResponse(200, output);
+								// 		} else {
+								// 			std::cerr << DEBUG_MSG << "Failed to fork for CGI processing" << std::endl;
+								// 			response = createHtmlResponse(500, "Internal Server Error");
+								// 		}
+								// 	} else {
+								// 		std::cerr << DEBUG_MSG << "File does not exist" << std::endl;
+								// 		response = createHtmlResponse(404, "File not found");
+								// 	}
+								// }
+
+								// else
+								// {
+								// 	std::cerr << DEBUG_MSG << "Checking If File Existed" << std::endl;
+								// 	// check if file exist
+								// 	std::map<std::string, std::string>::const_iterator rootDirective = matchedServer->directives.find("root");
+								// 	std::string filePath = rootDirective->second + request.path;
+								// 	std::cerr << DEBUG_MSG << "File path: " << filePath << std::endl;
+
+								// 	if (checkFileExist(filePath))
+								// 	{
+								// 		std::cerr << "\033[1;31m" << DEBUG_MSG << "File exist 3" << "\033[0m" << std::endl;
+
+								// 		response = createHtmlResponse(200, readHtmlFile(filePath));
+								// 	}
+								// 	else
+								// 	{
+								// 		std::cerr << "\033[1;31m" << DEBUG_MSG << "File not exist" << "\033[0m" << std::endl;
+
+								// 		response = createHtmlResponse(404, "File not found");
+								// 	}
+								// }
+
+								// response = createHtmlResponse(404, "File not found");
+								// // check if cgi
+								// // std::map<std::string, std::string>::const_iterator cgiDirective = matchedServer->directives.find("cgi");
+
+								// // if (cgiDirective != matchedServer->directives.end())
+								// // {
+								// // 	std::cerr << "CGI found" << std::endl;
+
+								// // }
+								// }
+
 						}
 					}
 					else
 					{
-						std::cerr << "No matching server found" << std::endl;
+						std::cerr << DEBUG_MSG << "No matching server found" << std::endl;
 
 						// if (request.path.find(".png") != std::string::npos)
 						// {
@@ -1088,7 +1278,7 @@ void ConfigHandler::execute() const
 				else
 				{
 					// Connection closed or an error occurred
-					std::cerr << "Error receiving data" << std::endl;
+					std::cerr << DEBUG_MSG << "Error receiving data" << std::endl;
 					close(*it);
 					it = activeSockets.erase(it); // Erase returns the next iterator
 					continue;
@@ -1130,29 +1320,29 @@ void ConfigHandler::testPrintAll() const
 	std::map<std::string, std::string>::const_iterator cur;
 	std::map<std::string, std::string>::const_iterator end;
 
-	std::cout << "============== Global Config ===============" << std::endl;
+	std::cerr << "============== Global Config ===============" << std::endl;
 	cur = _globalConfig.begin();
 	end = _globalConfig.end();
 	while (cur != end)
 	{
-		std::cout << std::setw(10) << "Global =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+		std::cerr << std::setw(10) << "Global =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
 		cur++;
 	}
 
-	std::cout << "============== HTTP config ==============" << std::endl;
+	std::cerr << "============== HTTP config ==============" << std::endl;
 	cur = _httpConfig.directives.begin();
 	end = _httpConfig.directives.end();
 	while (cur != end)
 	{
-		std::cout << std::setw(10) << "HTTP =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+		std::cerr << std::setw(10) << "HTTP =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
 		cur++;
 	}
-	std::cout << "=============== default err pages ===============" << std::endl;
+	std::cerr << "=============== default err pages ===============" << std::endl;
 	cur = _httpConfig.defaultErrorPages.begin();
 	end = _httpConfig.defaultErrorPages.end();
 	while (cur != end)
 	{
-		std::cout << std::setw(10) << "DEPs =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+		std::cerr << std::setw(10) << "DEPs =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
 		cur++;
 	}
 
@@ -1160,18 +1350,18 @@ void ConfigHandler::testPrintAll() const
 
 	while (curServ != _httpConfig.servers.end())
 	{
-		std::cout << "============== Server config ==============" << std::endl;
-		std::cout << std::setw(10) << "SERVER =" << std::setw(25) << "listener"
+		std::cerr << "============== Server config ==============" << std::endl;
+		std::cerr << std::setw(10) << "SERVER =" << std::setw(25) << "listener"
 				  << " | " << (*curServ)->listener << std::endl;
 		// socket address ????
-		std::cout << std::setw(10) << "SERVER =" << std::setw(25) << "listen port"
+		std::cerr << std::setw(10) << "SERVER =" << std::setw(25) << "listen port"
 				  << " | " << (*curServ)->listen_port << std::endl;
 		// server Directive
 		cur = (*curServ)->directives.begin();
 		end = (*curServ)->directives.end();
 		while (cur != end)
 		{
-			std::cout << std::setw(10) << "SERVER =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+			std::cerr << std::setw(10) << "SERVER =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
 			cur++;
 		}
 		std::vector<Location>::const_iterator curLoc = (*curServ)->locations.begin();
@@ -1179,14 +1369,14 @@ void ConfigHandler::testPrintAll() const
 		while (curLoc != endLoc)
 		{
 			// print content in loc
-			std::cout << "------------------ Location config ------------------" << std::endl;
-			std::cout << std::setw(10) << "LOC =" << std::setw(25) << "Location path"
+			std::cerr << "------------------ Location config ------------------" << std::endl;
+			std::cerr << std::setw(10) << "LOC =" << std::setw(25) << "Location path"
 					  << " | " << curLoc->path << std::endl;
 			cur = curLoc->directives.begin();
 			end = curLoc->directives.end();
 			while (cur != end)
 			{
-				std::cout << std::setw(10) << "LOC dir =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+				std::cerr << std::setw(10) << "LOC dir =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
 				cur++;
 			}
 			// cgi
@@ -1194,7 +1384,7 @@ void ConfigHandler::testPrintAll() const
 			end = curLoc->cgi.end();
 			while (cur != end)
 			{
-				std::cout << std::setw(10) << "LOC cgi =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+				std::cerr << std::setw(10) << "LOC cgi =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
 				cur++;
 			}
 
@@ -1203,7 +1393,7 @@ void ConfigHandler::testPrintAll() const
 			end = curLoc->upload.end();
 			while (cur != end)
 			{
-				std::cout << std::setw(10) << "LOC upld =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
+				std::cerr << std::setw(10) << "LOC upld =" << std::setw(25) << cur->first << " | " << cur->second << std::endl;
 				cur++;
 			}
 			curLoc++;

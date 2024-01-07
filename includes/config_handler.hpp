@@ -27,6 +27,8 @@
 #include <signal.h>
 #include <dirent.h>
 
+#include "webserve.hpp"
+
 typedef struct s_HttpRequset
 {
 	std::string method;

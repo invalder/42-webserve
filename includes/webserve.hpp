@@ -21,4 +21,6 @@ using std::cerr;
 using std::endl;
 using std::string;
 
+# define DEBUG_MSG "[DEBUG_MSG] : "
+
 #endif

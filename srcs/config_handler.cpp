@@ -479,7 +479,7 @@ std::string readHtmlFile(const std::string &filePath)
 	std::ostringstream buffer;
 	buffer << htmlFile.rdbuf();
 
-	std::cerr << DEBUG_MSG << "Read HTML file: " << buffer.str() << std::endl;
+	// std::cerr << DEBUG_MSG << "Read HTML file: " << buffer.str() << std::endl;
 
 	return buffer.str();
 }
@@ -939,6 +939,9 @@ void ConfigHandler::execute() const
 			{
 				char buffer[4096];
 				ssize_t bytesReceived = recv(*it, buffer, sizeof(buffer), 0);
+
+				std::cout << "Buffer: " << buffer << std::endl;
+
 				if (bytesReceived > 0)
 				{
 					// Process the data
@@ -990,6 +993,7 @@ void ConfigHandler::execute() const
 								}
 								else
 								{
+
 									// check if file exist
 									std::map<std::string, std::string>::const_iterator rootDirective = matchedLocation->directives.find("root");
 									std::map<std::string, std::string>::const_iterator defaultFile = matchedLocation->directives.find("default_file");
@@ -1112,6 +1116,7 @@ void ConfigHandler::execute() const
 
 										response = createHtmlResponse(404, "File not found");
 									}
+
 								}
 							}
 						}
@@ -1119,9 +1124,102 @@ void ConfigHandler::execute() const
 						{
 							std::cerr << DEBUG_MSG << "No matching location found" << std::endl;
 							std::cerr << DEBUG_MSG << "Checking CGI" << std::endl;
-							if (request.path.find(".py") != std::string::npos || request.path.find(".sh") != std::string::npos) {
+							if (request.path.find("/cgi-bin/") != std::string::npos && (request.path.find(".py") != std::string::npos || request.path.find(".sh") != std::string::npos)){
 								std::cerr << DEBUG_MSG << "CGI found" << std::endl;
-							} else {
+								// Get the root directory from server configuration
+
+								std::map<std::string, std::string>::const_iterator rootDirective = matchedServer->directives.find("root");
+
+								if (rootDirective != matchedServer->directives.end())
+								{
+									std::string filePath = rootDirective->second + request.path;
+
+									std::cerr << DEBUG_MSG << "File path: " << filePath << std::endl;
+
+									// Check if the CGI script exists
+									if (checkFileExist(filePath))
+									{
+										std::cerr << DEBUG_MSG << "File exists, executing CGI" << std::endl;
+
+										// Set up pipes for communication
+										int pipeCgi[2];
+										pipe(pipeCgi);
+
+										pid_t pid = fork();
+										if (pid == 0)
+										{
+											// Child process
+
+											// Close the read end of the pipe, it's not needed
+											close(pipeCgi[0]);
+
+											// Redirect stdout to the write end of the pipe
+											dup2(pipeCgi[1], STDOUT_FILENO);
+
+											// Construct the argument array for execve
+											char *args[] = {const_cast<char *>(filePath.c_str()), NULL};
+
+											// Execute the CGI script
+											execve(args[0], args, environ);
+
+											// Exit the child process when done
+											exit(0);
+										}
+										else if (pid > 0)
+										{
+											// Parent process
+
+											// Close the write end of the pipe, it's not needed
+											close(pipeCgi[1]);
+
+											// Read from the pipe
+											char buffer[4096];
+											std::string output;
+											ssize_t bytesRead;
+
+											while ((bytesRead = read(pipeCgi[0], buffer, sizeof(buffer) - 1)) > 0)
+											{
+												buffer[bytesRead] = '\0'; // Null-terminate the buffer
+												output += buffer;
+											}
+
+											std::cerr << DEBUG_MSG << "Output: " << output << std::endl;
+
+											// Close the read end of the pipe
+											close(pipeCgi[0]);
+
+											// Wait for the child process to finish
+											waitpid(pid, NULL, 0);
+
+											// Create the response with the output of the CGI script
+											response = createHtmlResponse(200, output);
+										}
+										else
+										{
+											std::cerr << DEBUG_MSG << "Failed to fork for CGI processing" << std::endl;
+											response = createHtmlResponse(500, "Internal Server Error");
+										}
+									}
+									else
+									{
+										std::cerr << DEBUG_MSG << "File does not exist" << std::endl;
+										response = createHtmlResponse(404, "File not found");
+									}
+
+								}
+							}
+							else if (request.path.find("/upload/") != std::string::npos)
+							{
+								std::cerr << DEBUG_MSG << "Upload found" << std::endl;
+								std::cerr << DEBUG_MSG << "Request body: " << request.body << std::endl;
+
+								// std::string boundary = contentType.substr(contentType.find("boundary=") + 9);
+
+								// Get the root directory from server configuration
+								response = createHtmlResponse(200, "Recieved");
+							}
+							else
+							{
 								std::cerr << DEBUG_MSG << "CGI not found" << std::endl;
 								std::cerr << DEBUG_MSG << "Checking if File Existed" << std::endl;
 
@@ -1129,19 +1227,39 @@ void ConfigHandler::execute() const
 								std::string filePath = rootDirective->second + request.path;
 								std::cerr << DEBUG_MSG << "File path: " << filePath << std::endl;
 
-								if (checkFileExist(filePath))
+								struct stat s;
+								if (stat(filePath.c_str(), &s) == 0)
 								{
-									std::cerr << "\033[1;31m" << DEBUG_MSG << "File exist 3" << "\033[0m" << std::endl;
+									if (s.st_mode & S_IFDIR)
+									{
+										// if directory return 404
+										response = createHtmlResponse(404, "File not found");
+									}
+									else
+									{
+										if (checkFileExist(filePath))
+										{
+											std::cerr << "\033[1;31m" << DEBUG_MSG << "File exist 3" << "\033[0m" << std::endl;
 
-									// response = createHtmlResponse(200, readHtmlFile(filePath));
-									response = createFileResponse(200, filePath);
+											// response = createHtmlResponse(200, readHtmlFile(filePath));
+											response = createFileResponse(200, filePath);
+										}
+										else
+										{
+											std::cerr << "\033[1;31m" << DEBUG_MSG << "File not exist" << "\033[0m" << std::endl;
+
+											response = createHtmlResponse(404, "File not found");
+										}
+									}
 								}
 								else
 								{
+									// error
 									std::cerr << "\033[1;31m" << DEBUG_MSG << "File not exist" << "\033[0m" << std::endl;
 
 									response = createHtmlResponse(404, "File not found");
 								}
+
 							}
 
 								// // check if cgi

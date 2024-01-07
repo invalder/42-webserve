@@ -60,7 +60,7 @@ static inline int splitKeyValue(std::string line, std::string &key, std::string 
 	return 0;
 }
 
-void parseDefaultErrorPages(std::ifstream &file, HTTPConfig &httpConfig)
+void parseDefaultErrorPages(std::ifstream &file, HTTPConfig &httpConfig, std::string cwd)
 {
 	std::string line;
 
@@ -79,13 +79,13 @@ void parseDefaultErrorPages(std::ifstream &file, HTTPConfig &httpConfig)
 
 		if (!key.empty() && !value.empty())
 		{
-			httpConfig.defaultErrorPages[key] = value;
+			httpConfig.defaultErrorPages[key] = cwd + value;
 		}
 	}
 	return;
 }
 
-static inline void parseAddMap(std::ifstream &file, std::map<std::string, std::string> &toAdd)
+static inline void parseAddMap(std::ifstream &file, std::map<std::string, std::string> &toAdd, std::string cwd)
 {
 	std::string line;
 
@@ -104,12 +104,16 @@ static inline void parseAddMap(std::ifstream &file, std::map<std::string, std::s
 
 		if (!key.empty() && !value.empty())
 		{
+			if (key == "save_path") {
+				value = cwd + value;
+			}
 			toAdd[key] = value;
 		}
+		std::cout << DEBUG_MSG << "QWERTY " << "KEY: " << key << " VALUE: " << value << std::endl;
 	}
 }
 
-void parseLocationConfig(std::ifstream &file, Server *currentServer, std::string line)
+void parseLocationConfig(std::ifstream &file, Server *currentServer, std::string line, std::string cwd)
 {
 	trim(line);
 	// get location path from first line
@@ -128,12 +132,12 @@ void parseLocationConfig(std::ifstream &file, Server *currentServer, std::string
 		if (line.find("cgi") != std::string::npos && line.find("{") != std::string::npos)
 		{
 			// add cgi to current location
-			parseAddMap(file, toAddLoc.cgi);
+			parseAddMap(file, toAddLoc.cgi, cwd);
 		}
 		else if (line.find("upload") != std::string::npos && line.find("{") != std::string::npos)
 		{
 			// add upload to current location
-			parseAddMap(file, toAddLoc.upload);
+			parseAddMap(file, toAddLoc.upload, cwd);
 		}
 		else
 		{
@@ -151,6 +155,9 @@ void parseLocationConfig(std::ifstream &file, Server *currentServer, std::string
 				value.erase(std::remove(value.begin(), value.end(), ']'), value.end());
 				value.erase(std::remove(value.begin(), value.end(), ','), value.end());
 
+				if (key == "root") {
+					value = cwd + value;
+				}
 				toAddLoc.directives[key] = value;
 			}
 		}
@@ -224,7 +231,7 @@ void parseHttpDirectives(std::string line, HTTPConfig &httpConfig)
 }
 
 // Helper function to parse server directives
-void parseServerDirectives(std::string line, Server *currentServer)
+void parseServerDirectives(std::string line, Server *currentServer, std::string cwd)
 {
 	// Trim any leading and trailing whitespace from the line
 	trim(line);
@@ -263,7 +270,10 @@ void parseServerDirectives(std::string line, Server *currentServer)
 	// Store the key-value pair in the directives map
 	if (!key.empty() && !value.empty())
 	{
-		// std::cerr << "Adding directive " << key << " with value " << value << std::endl;
+		if (key == "root") {
+			value = cwd + value;
+		}
+		std::cerr << DEBUG_MSG << "Adding directive " << key << " with value " << value << std::endl;
 		currentServer->directives[key] = value;
 	}
 }
@@ -284,6 +294,14 @@ ConfigHandler::ConfigHandler()
  */
 ConfigHandler::ConfigHandler(std::string fileName)
 {
+	// get current working directory
+
+	char cwd[1024];  // You may need to adjust the buffer size accordingly
+	getcwd(cwd, sizeof(cwd));
+
+	this->_cwd = cwd;
+
+	std::cout << "CWD: " << this->_cwd << std::endl;
 	// get infile stream from file name
 	// std::ifstream fileIn = this->_getFileStream( fileName );
 	// std::ifstream fileIn(fileName.c_str(), std::ifstream::in);
@@ -666,7 +684,7 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string &filename)
 			// cx if default error pages
 			if (line.find("default_error_pages {") != std::string::npos)
 			{
-				parseDefaultErrorPages(file, _httpConfig);
+				parseDefaultErrorPages(file, _httpConfig, this->_cwd);
 			}
 			// Parse http directives
 			parseHttpDirectives(line, _httpConfig);
@@ -679,9 +697,9 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string &filename)
 			// std::cerr << "Parsing server directive" << line << std::endl;
 			if (currentServer && line.find("location ") != std::string::npos && line.find(" {") != std::string::npos)
 			{
-				parseLocationConfig(file, currentServer, line);
+				parseLocationConfig(file, currentServer, line, this->_cwd);
 			}
-			parseServerDirectives(line, currentServer);
+			parseServerDirectives(line, currentServer, this->_cwd);
 			// printServerDirectives();
 			continue;
 		}
@@ -1004,7 +1022,7 @@ void ConfigHandler::execute() const
 									}
 
 									std::string filePath = rootDirective->second + request.path;
-									std::cerr << DEBUG_MSG << "File path: " << filePath << std::endl;
+									std::cerr << DEBUG_MSG << "TEST TEST File path: " << filePath << std::endl;
 
 									// check if directory or file
 									struct stat s;
@@ -1377,11 +1395,11 @@ void ConfigHandler::execute() const
 
 						// if (request.path.find(".png") != std::string::npos)
 						// {
-						// 	response = createHtmlResponse(200, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404_error_page.png"));
+						// 	response = createHtmlResponse(200, readHtmlFile(this->_cwd + "/htdocs/error/404_error_page.png"));
 						// }
 						// else
 						// {
-						// 	response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+						// 	response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 						// }
 					}
 					send(*it, response.c_str(), response.length(), 0);

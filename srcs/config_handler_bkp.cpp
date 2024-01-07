@@ -956,7 +956,7 @@ void ConfigHandler::execute() const
 							}
 
 							if (!isMethodMatch) {
-								response = createHtmlResponse(405, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/405.html"));
+								response = createHtmlResponse(405, readHtmlFile(this->_cwd + "/htdocs/error/405.html"));
 							} else {
 								// handle cgi
 								std::map<std::string, std::string>::const_iterator cgiDirective = matchedLocation->cgi.find("cgi");
@@ -1059,13 +1059,13 @@ void ConfigHandler::execute() const
 								else
 								{
 									// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
-									response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+									response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 								}
 							}
 							else
 							{
 								// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
-								response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+								response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 							}
 
 
@@ -1089,13 +1089,13 @@ void ConfigHandler::execute() const
 								else
 								{
 									// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
-									response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+									response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 								}
 							}
 							else
 							{
 								// response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
-								response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+								response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 							}
 						}
 					}
@@ -1105,14 +1105,14 @@ void ConfigHandler::execute() const
 
 						if (request.path.find(".png") != std::string::npos)
 						{
-							response = createHtmlResponse(200, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404_error_page.png"));
+							response = createHtmlResponse(200, readHtmlFile(this->_cwd + "/htdocs/error/404_error_page.png"));
 						}
 						else
 						{
-							response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+							response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 						}
 						// // response = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot found";
-						// response = createHtmlResponse(404, readHtmlFile("/Users/nnakarac/code/42/cursus/42-webserve/htdocs/error/404.html"));
+						// response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 					}
 
 					send(*it, response.c_str(), response.length(), 0);

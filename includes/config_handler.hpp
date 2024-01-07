@@ -85,6 +85,8 @@ class ConfigHandler
 	private:
 		std::string _data;
 
+		std::string _cwd;
+
 		mutable std::vector<int> _boundPorts;
 
 		/**

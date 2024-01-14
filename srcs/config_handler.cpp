@@ -403,6 +403,8 @@ t_HttpRequest parseHttpRequest(std::string requestString)
 				request.body += "\n"; // Maintain line breaks in body
 			}
 		}
+
+		std::cout << BMAG << "BODY: " << request.body << RESET << std::endl;
 	}
 
 	return request;
@@ -546,6 +548,107 @@ std::string createHtmlResponse(int statusCode, const std::string &htmlContent)
 			 << "Content-Length: " << htmlContent.length() << "\r\n\r\n"
 			 << htmlContent;
 	return response.str();
+}
+
+static std::string callPythonCgi(char * const args[], char * const envp[])
+{
+
+	// Set up pipes for communication
+	int pipeCgi[2];
+	pipe(pipeCgi);
+
+	pid_t pid = fork();
+	if (pid == 0)
+	{
+		// Child process
+
+		// Close the read end of the pipe, it's not needed
+		close(pipeCgi[0]);
+
+		// Redirect stdout to the write end of the pipe
+		dup2(pipeCgi[1], STDOUT_FILENO);
+
+		// Execute the CGI script
+		execve(args[0], args, envp);
+
+		// Exit the child process when done
+		exit(0);
+	}
+	else if (pid > 0)
+	{
+		// Parent process
+
+		// Close the write end of the pipe, it's not needed
+		close(pipeCgi[1]);
+
+		int status;
+		// Wait for the child process to finish
+		waitpid(pid, &status, 0);
+
+		switch (status)
+		{
+			case 1:
+				return createHtmlResponse(500, "Internal Server Error");
+			case 2:
+				return createHtmlResponse(405, "Method Not Allowed");
+		}
+
+		// Read from the pipe
+		char buffer[4096];
+		std::string output;
+		ssize_t bytesRead;
+
+		while ((bytesRead = read(pipeCgi[0], buffer, sizeof(buffer) - 1)) > 0)
+		{
+			buffer[bytesRead] = '\0'; // Null-terminate the buffer
+			output += buffer;
+		}
+
+		std::cerr << "CALL CGI Output: " << output << std::endl;
+
+		// Close the read end of the pipe
+		close(pipeCgi[0]);
+
+		return createHtmlResponse(200, output);
+	}
+	else
+	{
+		std::cerr << DEBUG_MSG << "Failed to fork for CGI processing" << std::endl;
+		return createHtmlResponse(500, "Internal Server Error");
+	}
+}
+
+char * const *createCgiEnvp( const std::map<std::string, std::string> &cgiEnv )
+{
+	// Create a new environment array
+	char **envp = new char *[cgiEnv.size() + 1];
+
+	// Copy the environment variables from the map to the array
+	int i = 0;
+	for (std::map<std::string, std::string>::const_iterator it = cgiEnv.begin(); it != cgiEnv.end(); ++it)
+	{
+		std::string envVar = it->first + "=" + it->second;
+		// print envVar in green
+		std::cerr << "\033[1;32m" << "envVar: " << envVar << "\033[0m" << std::endl;
+		envp[i] = new char[envVar.length() + 1];
+		strcpy(envp[i], envVar.c_str());
+		i++;
+	}
+
+	// Add a null terminator to the end of the array
+	envp[i] = NULL;
+
+	return envp;
+}
+
+std::string getCgiFileName(std::string method) {
+	if (method == "POST") {
+		return "/upload.py";
+	}
+	else if (method == "DELETE") {
+		return "/delete.py";
+	}
+	return "";
 }
 
 std::string getFileExtension(const std::string& filePath) {
@@ -823,6 +926,8 @@ void ConfigHandler::bindAndSetSocketOptions() const
 bool ConfigHandler::checkFileExist(std::string path) const
 {
 	std::ifstream file(path.c_str());
+	std::cerr << DEBUG_MSG << "Check file exist: " << path << std::endl;
+	std::cerr << DEBUG_MSG << "Check file exist: " << file.good() << std::endl;
 	if (file.good())
 	{
 		return true;
@@ -959,6 +1064,7 @@ void ConfigHandler::execute() const
 				ssize_t bytesReceived = recv(*it, buffer, sizeof(buffer), 0);
 
 				std::cout << "Buffer: " << buffer << std::endl;
+				std::cout << "END " << std::endl;
 
 				if (bytesReceived > 0)
 				{
@@ -1148,75 +1254,91 @@ void ConfigHandler::execute() const
 
 								std::map<std::string, std::string>::const_iterator rootDirective = matchedServer->directives.find("root");
 
+								// TODO: What is this block for? need to find out
 								if (rootDirective != matchedServer->directives.end())
 								{
-									std::string filePath = rootDirective->second + request.path;
+									std::string rootDir = rootDirective->second;
+									std::string filePath = rootDir + request.path;
+
+									// TODO: get cgi file name may need to add file name by request in below function
+									std::string cgiFileName = getCgiFileName(request.method);
+
+									std::cout << BGRN << "rootDir: " << rootDir << RESET << std::endl;
 
 									std::cerr << DEBUG_MSG << "File path: " << filePath << std::endl;
 
 									// Check if the CGI script exists
 									if (checkFileExist(filePath))
 									{
-										std::cerr << DEBUG_MSG << "File exists, executing CGI" << std::endl;
+										std::cerr << BYEL << DEBUG_MSG << "File exists, executing CGI" << RESET << std::endl;
 
-										// Set up pipes for communication
-										int pipeCgi[2];
-										pipe(pipeCgi);
+										std::string executable = "/usr/bin/python3";
 
-										pid_t pid = fork();
-										if (pid == 0)
-										{
-											// Child process
+										// Construct the argument array for execve
+										char * const args[] = { (char *)executable.c_str(), (char *)filePath.c_str(), NULL};
 
-											// Close the read end of the pipe, it's not needed
-											close(pipeCgi[0]);
+										// call python cgi
+										response = callPythonCgi(args, environ);
 
-											// Redirect stdout to the write end of the pipe
-											dup2(pipeCgi[1], STDOUT_FILENO);
+										// TODO: Remove this after testing this blocks
+										// // Set up pipes for communication
+										// int pipeCgi[2];
+										// pipe(pipeCgi);
 
-											// Construct the argument array for execve
-											char *args[] = {const_cast<char *>(filePath.c_str()), NULL};
+										// pid_t pid = fork();
+										// if (pid == 0)
+										// {
+										// 	// Child process
 
-											// Execute the CGI script
-											execve(args[0], args, environ);
+										// 	// Close the read end of the pipe, it's not needed
+										// 	close(pipeCgi[0]);
 
-											// Exit the child process when done
-											exit(0);
-										}
-										else if (pid > 0)
-										{
-											// Parent process
+										// 	// Redirect stdout to the write end of the pipe
+										// 	dup2(pipeCgi[1], STDOUT_FILENO);
 
-											// Close the write end of the pipe, it's not needed
-											close(pipeCgi[1]);
+										// 	// Construct the argument array for execve
+										// 	char *args[] = {(char *)filePath.c_str(), NULL};
 
-											// Read from the pipe
-											char buffer[4096];
-											std::string output;
-											ssize_t bytesRead;
+										// 	// Execute the CGI script
+										// 	execve(args[0], args, environ);
 
-											while ((bytesRead = read(pipeCgi[0], buffer, sizeof(buffer) - 1)) > 0)
-											{
-												buffer[bytesRead] = '\0'; // Null-terminate the buffer
-												output += buffer;
-											}
+										// 	// Exit the child process when done
+										// 	exit(0);
+										// }
+										// else if (pid > 0)
+										// {
+										// 	// Parent process
 
-											std::cerr << DEBUG_MSG << "Output: " << output << std::endl;
+										// 	// Close the write end of the pipe, it's not needed
+										// 	close(pipeCgi[1]);
 
-											// Close the read end of the pipe
-											close(pipeCgi[0]);
+										// 	// Read from the pipe
+										// 	char buffer[4096];
+										// 	std::string output;
+										// 	ssize_t bytesRead;
 
-											// Wait for the child process to finish
-											waitpid(pid, NULL, 0);
+										// 	while ((bytesRead = read(pipeCgi[0], buffer, sizeof(buffer) - 1)) > 0)
+										// 	{
+										// 		buffer[bytesRead] = '\0'; // Null-terminate the buffer
+										// 		output += buffer;
+										// 	}
 
-											// Create the response with the output of the CGI script
-											response = createHtmlResponse(200, output);
-										}
-										else
-										{
-											std::cerr << DEBUG_MSG << "Failed to fork for CGI processing" << std::endl;
-											response = createHtmlResponse(500, "Internal Server Error");
-										}
+										// 	std::cerr << DEBUG_MSG << "Output: " << output << std::endl;
+
+										// 	// Close the read end of the pipe
+										// 	close(pipeCgi[0]);
+
+										// 	// Wait for the child process to finish
+										// 	waitpid(pid, NULL, 0);
+
+										// 	// Create the response with the output of the CGI script
+										// 	response = createHtmlResponse(200, output);
+										// }
+										// else
+										// {
+										// 	std::cerr << DEBUG_MSG << "Failed to fork for CGI processing" << std::endl;
+										// 	response = createHtmlResponse(500, "Internal Server Error");
+										// }
 									}
 									else
 									{
@@ -1229,12 +1351,74 @@ void ConfigHandler::execute() const
 							else if (request.path.find("/upload/") != std::string::npos)
 							{
 								std::cerr << DEBUG_MSG << "Upload found" << std::endl;
-								std::cerr << DEBUG_MSG << "Request body: " << request.body << std::endl;
 
-								// std::string boundary = contentType.substr(contentType.find("boundary=") + 9);
+								std::map<std::string, std::string>::const_iterator rootDirective = matchedServer->directives.find("root");
+
+								std::string rootDir = "/htdocs";
+								if (rootDirective != matchedServer->directives.end())
+								{
+									rootDir = rootDirective->second;
+								}
+
+								// construct map for envp
+								std::map<std::string, std::string> cgiEnvpMap;
+								std::string fileName;
+								std::string absoluteFilePath;
+								
+								if (request.method == "DELETE")
+								{
+									// get file name from request.path (request.path = /upload/?file=filename)
+									fileName = request.path.substr(request.path.find("file=") + 5);
+									absoluteFilePath = rootDir + "/upload/" + fileName;
+									if (!checkFileExist(absoluteFilePath))
+									{
+										response = createHtmlResponse(404, "File not found");
+										continue;
+									}
+								}
+								else
+								{
+									fileName = request.headers["File-name"];
+								}
+								// Construct absolute file path
+								absoluteFilePath = rootDir + "/upload/" + fileName;
+								
+								// get cgi file name
+								std::string cgiFileName = getCgiFileName(request.method);
+								std::string filePath = rootDir + "/cgi-bin" + cgiFileName;
+
+								std::string executable = "/usr/bin/python3";
+
+								std::cerr << DEBUG_MSG << "File path: " << filePath << std::endl;
+
+								// set value in envp map
+								cgiEnvpMap["FILE_PATH"] = absoluteFilePath;
+								cgiEnvpMap["PATH_INFO"] = request.path;
+								cgiEnvpMap["REQUEST_METHOD"] = request.method;
+								cgiEnvpMap["UPLOAD_DIR"] = rootDir + "/upload";
+								cgiEnvpMap["BODY"] = request.body;
+								cgiEnvpMap["CONTENT_TYPE"] = request.headers["Content-Type"];
+
+								// call python cgi
+								char * const *cgiEnvp = createCgiEnvp(cgiEnvpMap);
+
+								char * const args[] = { (char *)executable.c_str(), (char *)filePath.c_str(), NULL};
+								// char * const args[2] = {const_cast<char *>(filePath.c_str()), NULL};
+
+								try {
+									response = callPythonCgi(args, cgiEnvp);
+								}
+								catch (std::exception &e) {
+									std::cerr << BRED << "Error: " << e.what() << RESET << std::endl;
+									response = createHtmlResponse(500, "Internal Server Error");
+								}
+
+								// response = callPythonCgi(filePath, request.body);
+
+								std::cerr << DEBUG_MSG << "Response: " << response << std::endl;
 
 								// Get the root directory from server configuration
-								response = createHtmlResponse(200, "Recieved");
+								// response = createHtmlResponse(200, "Recieved");
 							}
 							else
 							{
@@ -1279,6 +1463,8 @@ void ConfigHandler::execute() const
 								}
 
 							}
+
+								// TODO: Confirm this block is not needed, if so, remove it
 
 								// // check if cgi
 								// // check if file exist (.py and .sh)

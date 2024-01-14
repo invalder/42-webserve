@@ -28,6 +28,7 @@
 #include <dirent.h>
 
 #include "webserve.hpp"
+#include "color.hpp"
 
 typedef struct s_HttpRequset
 {

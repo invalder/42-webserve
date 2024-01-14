@@ -35,40 +35,48 @@
 
 		const submitUpload = document.getElementById("submitUpload");
 
-		submitUpload.addEventListener("click", (e) => {
+		submitUpload.addEventListener("click", async (e) => {
 			e.preventDefault(); // not refresh page
-			let formData = new FormData();
-			let fileField = document.querySelector("input[type='file']");
-			formData.append("file", fileField.files[0]);
+			const fileField = document.querySelector("input[type='file']");
+			console.log(fileField.file);
+			
+			const file = fileField.files[0];
+			console.log(file);
 
-			axios.request({
-				method: "POST",
-				url: `http://${local_host}/upload/`,
-				data: formData,
-				headers: {
-					"Content-Type": "multipart/form-data",
-				},
-			}).then(function (response) {
-				console.log(response.data);
-			}).catch(function (error) {
-				console.log(error);
-			});
+			if (file && file.type === "text/plain") {
+				fileContent = new FileReader();
+				fileContent.readAsText(file);
+				fileContent.onload = async (e) => {
+					console.log(e.target.result);
+					await fetch(`http://${local_host}/upload/`, { 
+						method: 'POST',
+						body: e.target.result,
+						headers: {
+							'Content-Type': "Text/plain",
+							'File-name': file.name,
+						},
+					}).then(
+						(response) => { console.log('POST status:', response.status) },
+						(error) => { console.log(error) },
+					);
+				}
+			}
 		});
 
 		const submitDelete = document.getElementById("submitDelete");
 		const namefileDelete = document.getElementById("namefileDelete");
 
-		submitDelete.addEventListener("click", (e) => {
+		submitDelete.addEventListener("click", async (e) => {
 			e.preventDefault(); // not refresh page
 
-		axios.request({
-				method: "DELETE",
-				url: `http://${local_host}/upload/?file=${namefileDelete.value}`,
-			}).then(function (response) {
-				console.log(response.data);
-			}).catch(function (error) {
-				console.log(error);
-			});
+			console.log(namefileDelete.value)
+
+			await fetch(`http://${local_host}/upload/?file=${namefileDelete.value}`, { 
+				method: 'DELETE',
+			}).then(
+				(response) => { console.log('DELETE status:', response.status) },
+				(error) => { console.log(error) },
+			);
 		});
 
 		const setFileName = document.getElementById("setFileName");

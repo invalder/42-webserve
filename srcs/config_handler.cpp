@@ -550,7 +550,15 @@ std::string createHtmlResponse(int statusCode, const std::string &htmlContent)
 	return response.str();
 }
 
-static std::string callPythonCgi(char * const args[], char * const envp[])
+void timeoutHandler(int signum) {
+	if (signum == SIGALRM) {
+		std::cerr << BRED <<  "Timeout reached. The child process took too long to execute." << RESET << std::endl;
+		exit(_POSIX_TIMEOUTS);
+	
+	}
+}
+
+static std::string callPythonCgi(char * const args[], char * const envp[], unsigned int timeout=0)
 {
 
 	// Set up pipes for communication
@@ -567,6 +575,12 @@ static std::string callPythonCgi(char * const args[], char * const envp[])
 
 		// Redirect stdout to the write end of the pipe
 		dup2(pipeCgi[1], STDOUT_FILENO);
+
+		// catch signal for timeout
+		signal(SIGALRM, timeoutHandler);
+
+		// Set timeout for child process
+		alarm(timeout);
 
 		// Execute the CGI script
 		execve(args[0], args, envp);
@@ -591,6 +605,23 @@ static std::string callPythonCgi(char * const args[], char * const envp[])
 				return createHtmlResponse(500, "Internal Server Error");
 			case 2:
 				return createHtmlResponse(405, "Method Not Allowed");
+		}
+
+		// Check the exit status of the child process
+		if (WIFEXITED(status))
+		{
+			std::cerr << DEBUG_MSG << "Child process exited with status " << WEXITSTATUS(status) << std::endl;
+		}
+		else if (WIFSIGNALED(status))
+		{
+			if (WTERMSIG(status) == SIGALRM) {
+				std::cerr << BRED << "Timeout reached. The child process took too long to execute." << RESET << std::endl;
+				return createHtmlResponse(408, "Request Timeout");
+			}
+		}
+		else if (WIFSTOPPED(status))
+		{
+			std::cerr << DEBUG_MSG << "Child process was stopped by signal " << WSTOPSIG(status) << std::endl;
 		}
 
 		// Read from the pipe
@@ -1082,6 +1113,7 @@ void ConfigHandler::execute() const
 
 						// If Server Matched, Check Location ...
 						const Location *matchedLocation = matchRequestToLocation(request, matchedServer);
+						std::cout << BCYN << "Matched location: " << matchedLocation << RESET << std::endl;
 						if (matchedLocation)
 						{
 							std::cerr << DEBUG_MSG << "Matched location" << std::endl;
@@ -1347,6 +1379,38 @@ void ConfigHandler::execute() const
 									}
 
 								}
+							}
+							else if (request.path.find("/infinite") != std::string::npos)
+							{
+								// infinite loop cgi file name
+								std::string cgiFileName = this->_cwd + "/htdocs/cgi-bin/infinite.py";
+
+								// get root directive
+								std::map<std::string, std::string>::const_iterator rootDirective = matchedServer->directives.find("root");
+
+								std::string rootDir = "/htdocs";
+								if (rootDirective != matchedServer->directives.end())
+								{
+									rootDir = rootDirective->second;
+								}
+
+								// get cgi directive
+								std::map<std::string, std::string>::const_iterator cgiDirective = matchedServer->directives.find("cgi");
+
+								if (cgiDirective != matchedServer->directives.end())
+								{
+									cgiFileName = rootDir + "/htdocs" + cgiDirective->second;
+
+								}
+								std::cerr << BGRN << "cgiFileName: " << cgiFileName << RESET << std::endl;
+
+								std::string executable = "/usr/bin/python3";
+
+								char * const args[] = { (char *)executable.c_str(), (char *)cgiFileName.c_str(), NULL};
+
+								// call python cgi
+								response = callPythonCgi(args, NULL, 5);
+								// response = createHtmlResponse(200, "Recieved");
 							}
 							else if (request.path.find("/upload/") != std::string::npos)
 							{

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Infinite Loop</title>
+</head>
+<body>
+	<h1>Infinite Loop</h1>
+	<button id="infinite">Infinite Loop</button>
+	<script>
+		const local_host = window.location.host;
+
+		const infinite = document.getElementById("infinite");
+		infinite.addEventListener("click", async (e) => {
+			e.preventDefault(); // not refresh page
+
+			await fetch(`http://${local_host}/infinite/`, { 
+				method: 'GET',
+			}).then(
+				(response) => { console.log('GET status:', response.status) },
+				(error) => { console.log(error) },
+			);
+		});
+	</script>
+</body>
+</html>

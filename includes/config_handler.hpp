@@ -5,7 +5,9 @@
 #include <iomanip>
 
 #include <cstdlib>
+#include <ctime>
 #include <algorithm>
+#include <sys/wait.h>
 
 #include <iostream>
 #include <fstream>
@@ -96,27 +98,14 @@ class ConfigHandler
 		 * 	- value : server config
 		 */
 		std::map<std::string, std::string>	_globalConfig;
-
 		std::map<std::string, std::string> _configMap;
-
 		std::map<std::string, std::string> _locationConfigMap;
-
 		std::map<std::string, std::string> _cgiConfigMap;
 
 		void			_initializedConfigDataMap( std::ifstream & );
 		// std::ifstream	_getFileStream( std::string );
 		HTTPConfig		_httpConfig;
-
 		HTTPConfig 	_parseHTTPConfig(const std::string& filename);
-
-		// function to parse cgi block
-		void	_parseCGIConfig(std::ifstream &file);
-
-		// function to parse server block
-		void	_parseLocationConfig(std::ifstream &file);
-
-		// function to parse upload block
-		void	_parseUploadConfig(std::ifstream &file);
 
 	public:
 		ConfigHandler();
@@ -127,10 +116,10 @@ class ConfigHandler
 
 		// void	printData();
 
-		void	printHTTPConfig() const;
+		// void	printHTTPConfig() const;
 		void	printHTTPDirectives() const;
 
-		void	printServerConfig() const;
+		// void	printServerConfig() const;
 		void	printServerDirectives() const;
 
 		void	bindAndSetSocketOptions() const;
@@ -161,5 +150,22 @@ class ConfigHandler
 			virtual const char* what() const throw();
 	};
 };
+
+
+t_HttpRequest	parseHttpRequest(std::string requestString);
+
+// Utility
+
+std::string		getCgiFileName(std::string method);
+std::string		createHtmlResponse(int statusCode, const std::string &htmlContent);
+const Location	*matchRequestToLocation(const t_HttpRequest &request, Server *server);
+Server			*matchRequestToServer(const t_HttpRequest &request, const std::vector<Server *> &servers);
+std::string		readHtmlFile(const std::string &filePath);
+std::string		getHttpStatusString(int statusCode);
+std::string		formatSize(size_t size);
+void			timeoutHandler(int signum);
+char * const	*createCgiEnvp( const std::map<std::string, std::string> &cgiEnv );
+std::string		createFileResponse(int statusCode, const std::string &filePath);
+
 
 #endif

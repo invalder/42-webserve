@@ -3,13 +3,12 @@
 
 // TODO
 /*
-	- all method
-	- parser http request (divide 2 part)
-		|- body
-		|- header --> field, size, servername
-	- other limit detail
-		|- size ,server name
-		|- when restart server disable some method but it still in the http file
+	- check listen port
+	- cx method before delete
+	- download file + CGI download
+	- redirect (URL)
+	- 404 page
+
 
 */
 
@@ -23,7 +22,7 @@ int	main (int argc, char **argv)
 		try {
 			ConfigHandler configHandler = ConfigHandler( fileName );
 
-			configHandler.testPrintAll();
+			// configHandler.testPrintAll();
 
 			configHandler.bindAndSetSocketOptions();
 			configHandler.execute();

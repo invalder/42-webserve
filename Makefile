@@ -20,6 +20,9 @@ INCS = -Iincludes/
 
 SRCS = config_handler.cpp \
 	main.cpp \
+	server.cpp \
+	utility.cpp \
+	forTest.cpp 
 
 DBG = *.dSYM
 

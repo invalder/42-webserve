@@ -8,6 +8,13 @@
 <body>
 	<h1>Infinite Loop</h1>
 	<button id="infinite">Infinite Loop</button>
+
+	<h5>for test delete</h5>
+	<form>
+		<input type="text" name="namefile" id="namefileDelete">
+		<button type="submit" id="submitDelete">submit</button>
+	</form>
+
 	<script>
 		const local_host = window.location.host;
 
@@ -19,6 +26,22 @@
 				method: 'GET',
 			}).then(
 				(response) => { console.log('GET status:', response.status) },
+				(error) => { console.log(error) },
+			);
+		});
+
+		const submitDelete = document.getElementById("submitDelete");
+		const namefileDelete = document.getElementById("namefileDelete");
+
+		submitDelete.addEventListener("click", async (e) => {
+			e.preventDefault(); // not refresh page
+
+			console.log(namefileDelete.value)
+
+			await fetch(`http://${local_host}/infinite/?file=${namefileDelete.value}`, { 
+				method: 'DELETE',
+			}).then(
+				(response) => { console.log('DELETE status:', response.status) },
 				(error) => { console.log(error) },
 			);
 		});

@@ -3,7 +3,7 @@
 
 // TODO
 /*
-	- check listen port
+	- check listen port  --> look in directive
 	- cx method before delete
 	- download file + CGI download
 	- redirect (URL)
@@ -22,7 +22,7 @@ int	main (int argc, char **argv)
 		try {
 			ConfigHandler configHandler = ConfigHandler( fileName );
 
-			// configHandler.testPrintAll();
+			configHandler.testPrintAll();
 
 			configHandler.bindAndSetSocketOptions();
 			configHandler.execute();

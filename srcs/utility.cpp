@@ -53,6 +53,12 @@ const Location *matchRequestToLocation(const t_HttpRequest &request, Server *ser
 	return 0;
 }
 
+// std::vector<Server *>::const_iterator	*checkServerPort(std::string port, std::string servName, std::vector<Server *>::const_iterator *it)
+// {
+	 
+// }
+
+
 // Function to match the request to a server
 Server *matchRequestToServer(const t_HttpRequest &request, const std::vector<Server *> &servers)
 {
@@ -71,14 +77,18 @@ Server *matchRequestToServer(const t_HttpRequest &request, const std::vector<Ser
 		// Check if server has
 		return 0; // Or handle it according to your application logic
 	}
-
+	std::string	port = "";
+	bool	isPort = false;
 	// Optionally, you can parse the port from the requested host if it's in the format "host:port"
 	size_t colonPos = requestedHost.find(":");
 	if (colonPos != std::string::npos)
 	{
+		port = requestedHost.substr(colonPos + 1);
+		isPort = true;
 		requestedHost = requestedHost.substr(0, colonPos);
 	}
 
+	// find server name and find port
 	for (std::vector<Server *>::const_iterator it = servers.begin(); it != servers.end(); ++it)
 	{
 		std::map<std::string, std::string>::const_iterator itDirective = (*it)->directives.find("server_name");
@@ -86,14 +96,19 @@ Server *matchRequestToServer(const t_HttpRequest &request, const std::vector<Ser
 		{
 			// Split the server names by spaces and match each one
 			std::istringstream iss(itDirective->second);
-			std::string serverName;
-			while (iss >> serverName)
+			std::string serverName, serverPort;
+
+
+			std::map<std::string, std::string>::const_iterator	itPort = (*it)->directives.find("listen");
+			if (itPort != (*it)->directives.end()) 
 			{
-				if (serverName == requestedHost)
-				{
-					// Found a matching server
-					return *it;
-				}
+				serverPort = itPort->second;
+			}
+			
+			iss >> serverName;
+			if ((serverName == requestedHost || requestedHost == "localhost") && (port == serverPort || !isPort))
+			{
+				return *it;
 			}
 		}
 	}

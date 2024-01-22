@@ -32,6 +32,8 @@
 #include "webserve.hpp"
 #include "color.hpp"
 
+extern char **environ;
+
 typedef struct s_HttpRequset
 {
 	std::string method;
@@ -106,6 +108,7 @@ class ConfigHandler
 		// std::ifstream	_getFileStream( std::string );
 		HTTPConfig		_httpConfig;
 		HTTPConfig 	_parseHTTPConfig(const std::string& filename);
+		// bool		matchPort(t_HttpRequest request, Server *matchedServer);
 
 	public:
 		ConfigHandler();
@@ -135,6 +138,7 @@ class ConfigHandler
 		static void	signalHandler( int );
 		void	closePorts() const;
 
+		int		checkLocation(std::string &response, t_HttpRequest request, Server *matchedServer) const;
 	// exceptions
 	// file open exception
 	class FileOpenException : public std::exception

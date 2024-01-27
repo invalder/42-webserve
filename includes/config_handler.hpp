@@ -41,6 +41,8 @@ typedef struct s_HttpRequset
 	std::string httpVersion;
 	std::map<std::string, std::string> headers;
 	std::string body;
+	std::string requestPath;
+	std::string argPath;
 } t_HttpRequest;
 
 class Location {
@@ -162,7 +164,7 @@ t_HttpRequest	parseHttpRequest(std::string requestString);
 
 std::string		getCgiFileName(std::string method);
 std::string		createHtmlResponse(int statusCode, const std::string &htmlContent);
-const Location	*matchRequestToLocation(const t_HttpRequest &request, Server *server);
+const Location	*matchRequestToLocation(std::string requestPath, Server *server);
 Server			*matchRequestToServer(const t_HttpRequest &request, const std::vector<Server *> &servers);
 std::string		readHtmlFile(const std::string &filePath);
 std::string		getHttpStatusString(int statusCode);

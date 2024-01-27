@@ -102,7 +102,14 @@ std::string	createRedirectResponse(Location const *);
 // return err code or 0
 int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, Server *matchedServer) const
 {
-	const Location *matchedLocation = matchRequestToLocation(request, matchedServer);
+	// find second slash
+	size_t slashPos = request.path.find("/", 1);
+	// get request path until second slash
+	request.requestPath = request.path.substr(0, slashPos + 1);
+	// get arg path after second slash else empty string
+	request.argPath = request.path.substr(slashPos + 1);
+
+	const Location *matchedLocation = matchRequestToLocation(request.requestPath, matchedServer);
 	std::cout << BCYN << "Matched location: " << matchedLocation << RESET << std::endl;
 
 	std::string svmsg = "[SV-MSG] ";

@@ -20,17 +20,9 @@ std::string createHtmlResponse(int statusCode, const std::string &htmlContent)
 	return response.str();
 }
 
-const Location *matchRequestToLocation(const t_HttpRequest &request, Server *server)
+const Location *matchRequestToLocation(std::string requestPath, Server *server)
 {
-	// Check for null server pointer
-	if (server == NULL)
-	{
-		std::cerr << DEBUG_MSG << "Server is null" << std::endl;
-		return NULL;
-	}
-
-	const std::string &requestedPath = request.path;
-	std::cerr << DEBUG_MSG << "Requested path: " << requestedPath << std::endl;
+	std::cerr << DEBUG_MSG << "Requested path: " << requestPath << std::endl;
 
 	// Iterate through locations to find a match
 	for (std::vector<Location>::const_iterator it = server->locations.begin(); it != server->locations.end(); ++it)
@@ -38,7 +30,7 @@ const Location *matchRequestToLocation(const t_HttpRequest &request, Server *ser
 		const Location &location = *it;
 
 		// Check if the requested path starts with the location path
-		if (requestedPath == location.path)
+		if (requestPath == location.path)
 		{
 			// Found a matching location
 			// Return the address of the location in the vector

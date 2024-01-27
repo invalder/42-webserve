@@ -127,7 +127,7 @@ class ConfigHandler
 
 		void	bindAndSetSocketOptions() const;
 
-		void	execute() const;
+		void	run() const;
 
 		// ===== ForTest Remove Bofore Push =====
 		void	testPrintAll() const;

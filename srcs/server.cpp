@@ -107,7 +107,7 @@ void ConfigHandler::signalHandler(int signal)
 
 // ============ EXECUTE ================
 
-void ConfigHandler::execute() const
+void ConfigHandler::run() const
 {
 	// handle signal
 	signal(SIGINT, signalHandler);
@@ -119,6 +119,8 @@ void ConfigHandler::execute() const
 	fd_set readfds;
 	std::vector<int> activeSockets;
 	std::vector<int>::iterator it;
+
+	int		resNum = 0;
 
 	while (true)
 	{
@@ -189,14 +191,15 @@ void ConfigHandler::execute() const
 					if (matchedServer)
 					{
 						
-						// std::cerr << "\033[1;31m" << "Matched server: " << matchedServer << "\033[0m" << std::endl;
+						std::cerr << "\033[1;31m" << "Matched server: " << matchedServer << "\033[0m" << std::endl;
 
 						// if (!matchPort(request, matchedServer)) {
 						// 	continue ;
 						// }
 
 						// If Server Matched, Check Location ...
-						if (checkLocation(response, request, matchedServer))
+						resNum = checkLocation(response, request, matchedServer);
+						if (resNum == 1)
 							continue ;
 						
 					}
@@ -213,6 +216,7 @@ void ConfigHandler::execute() const
 						response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 						// }
 					}
+					// std::cout << "TEST-9999 RESPONSE == " << response << std::endl;
 					send(*it, response.c_str(), response.length(), 0);
 				}
 				else if (bytesReceived == 0)

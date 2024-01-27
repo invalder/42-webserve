@@ -25,7 +25,7 @@ int	main (int argc, char **argv)
 			configHandler.testPrintAll();
 
 			configHandler.bindAndSetSocketOptions();
-			configHandler.execute();
+			configHandler.run();
 
 			return (EXIT_SUCCESS);
 		} catch (std::exception &e) {

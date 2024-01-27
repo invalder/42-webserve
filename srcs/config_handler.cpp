@@ -102,7 +102,7 @@ static inline int splitKeyValue(std::string line, std::string &key, std::string 
 	key = line.substr(0, spacePos);
 	value = line.substr(spacePos + 1);
 
-	size_t colonPos = line.rfind(":");
+	size_t colonPos = key.find(":");
 	if (colonPos != std::string::npos)
 	{
 		key = key.substr(0, colonPos);

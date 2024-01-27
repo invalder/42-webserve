@@ -142,6 +142,8 @@ std::string getHttpStatusString(int statusCode)
 		return "Accepted";
 	case 204:
 		return "No Content";
+	case 301:
+		return "Moved Permanently";
 	case 400:
 		return "Bad Request";
 	case 401:

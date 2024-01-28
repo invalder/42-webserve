@@ -1,7 +1,7 @@
 NAME = Webserve
 
 CC = c++
-CFLAGS	= #-Wall -Wextra -Werror -Wshadow -Wno-shadow -std=c++98 #-fsanitize=address
+CFLAGS	= -Wall -Wextra -Werror -Wshadow -Wno-shadow -std=c++98 #-fsanitize=address
 
 RM		= rm -rf
 

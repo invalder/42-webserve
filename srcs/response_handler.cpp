@@ -113,17 +113,18 @@ std::string	createRedirectResponse(Location const *);
 int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, Server *matchedServer) const
 {
 	// find second slash
-	size_t slashPos = request.path.find("/", 1);
+	size_t pathSlashPos = request.path.find("/", 1);
+	size_t argSlashPos = request.path.rfind("/");
 	// get request path until second slash
 
-	std::cout << "request.path" << request.path << std::endl;
-	request.requestPath = request.path.substr(0, slashPos);
-	std::cout << "request.requestPath" << request.requestPath << std::endl;
+	std::cout << "request.path: " << request.path << std::endl;
+	request.requestPath = request.path.substr(0, pathSlashPos);
+	std::cout << "request.requestPath: " << request.requestPath << std::endl;
 	// get arg path after second slash else empty string
-	request.argPath = request.path.substr(slashPos + 1);
+	request.argPath = request.path.substr(argSlashPos);
 	if (request.argPath == request.requestPath)
 		request.argPath = "";
-	std::cout << "request.argPath" << request.argPath << std::endl;
+	std::cout << "request.argPath: " << request.argPath << std::endl;
 
 	// locahost/index/454
 
@@ -185,6 +186,9 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 
 std::string getAutoIndex(std::string path, std::string retPath)
 {
+	std::cerr << BGRN << "getAutoIndex" << RESET << std::endl;
+	std::cerr << BGRN << "path" << path << RESET << std::endl;
+	std::cerr << BGRN << "retPath" << retPath << RESET << std::endl;
 	DIR *dir;
 	struct dirent *ent;
 	struct stat fileInfo;
@@ -203,9 +207,27 @@ std::string getAutoIndex(std::string path, std::string retPath)
 
 			if(stat(fullPath.c_str(), &fileInfo) == 0) {
 				std::strftime(timeBuff, 20, "%Y-%m-%d %H:%M:%S", std::localtime(&fileInfo.st_mtime));
+				std::cerr << BGRN << "ent->d_name" << ent->d_name << RESET << std::endl;
+
+				std::string href = "";
+				if (!std::strcmp(ent->d_name, "."))
+				{
+					href = retPath;
+				}
+				else if (!std::strcmp(ent->d_name, ".."))
+				{
+					size_t pos = retPath.rfind("/");
+					href = retPath.substr(0, pos);
+					if (href == "")
+						href = "/";
+				}
+				else
+				{
+					href = retPath + "/" + ent->d_name;
+				}
 
 				responseTemp += "<tr><td><a href=\"";
-				responseTemp += retPath + "/" + ent->d_name;
+				responseTemp += href;
 				responseTemp += "\">";
 				responseTemp += ent->d_name;
 				responseTemp += "</a></td><td>";
@@ -224,6 +246,21 @@ std::string getAutoIndex(std::string path, std::string retPath)
 	}
 }
 
+bool	isDirectory(std::string path)
+{
+	struct stat s;
+
+	if (stat(path.c_str(), &s) == 0)
+	{
+		if (s.st_mode & S_IFDIR)
+		{
+			// it's a directory
+			return true;
+		}
+	}
+	return false;
+}
+
 int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpRequest request) const
 {
 	std::cout << SVMSG << "execute" << std::endl;
@@ -233,18 +270,21 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 
 	std::cout << "argPath: " << request.argPath.length() << std::endl;
 	std::cout << "argPath: " << request.argPath << std::endl;
+	std::cout << "reqPath: " << reqPath << std::endl;
 
 	// Check if its autoindex
 	if (reqPath == "/autoindex")
 	{
+		std::string fullArgPath = directives["root"] + reqPath + request.argPath;
+
 		// if arg path, it's file. otherwise, directory
-		if (request.argPath.length() == 0)
+		if (request.argPath.length() == 0 || isDirectory(fullArgPath))
 		{
 			std::cerr << DEBUG_MSG << "Autoindex" << std::endl;
-			fullPath = directives["root"] + reqPath;
+			fullPath = directives["root"] + reqPath + request.argPath;
 			std::cerr << DEBUG_MSG << "Full path: " << fullPath << std::endl;
 
-			std::string retPath = reqPath;
+			std::string retPath = reqPath + request.argPath;
 
 			response = getAutoIndex(fullPath, retPath);
 			return 200;
@@ -330,6 +370,7 @@ static bool	checkMethod(Location const *mLoc, t_HttpRequest Req)
 
 static bool checkRedirect(Location const *mLoc, std::string &response)
 {
+	(void) response;
 	// find return
 	std::map<std::string, std::string>::const_iterator	it = mLoc->directives.find("return");
 	if (it == mLoc->directives.end())
@@ -359,6 +400,8 @@ std::string	createRedirectResponse(Location const *mLoc)
 
 std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::string absFilePath, t_HttpRequest request)
 {
+	(void) rootDir;
+	(void) absFilePath;
 	std::map<std::string, std::string>	ret;
 
 	// remove / from argPath

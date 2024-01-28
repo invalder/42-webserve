@@ -129,9 +129,12 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 	if (matchedLocation)
 	{
 		// cx method
-		if (checkMethod(matchedLocation, request))
+		if (checkMethod(matchedLocation, request) || request.method == "HEAD")
 		{
-			response = createHtmlResponse(405, getHttpStatusString(405));
+			if (request.method == "HEAD")
+				response = createHtmlResponseOnlyHead(405);
+			else
+				response = createHtmlResponse(405, getHttpStatusString(405));
 			return 405;
 		}
 		// cx redirect

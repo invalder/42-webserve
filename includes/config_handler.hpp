@@ -4,6 +4,7 @@
 // for easy read test
 #include <iomanip>
 
+#include <cstring>
 #include <cstdlib>
 #include <ctime>
 #include <algorithm>
@@ -94,6 +95,7 @@ std::string		createHtmlResponse(int statusCode, const std::string &htmlContent);
 std::string		createFileResponse(int statusCode, const std::string &filePath);
 char * const	*createCgiEnvp( const std::map<std::string, std::string> &cgiEnv );
 std::string		readHtmlFile(const std::string &filePath);
+std::string 	createHtmlResponseOnlyHead(int statusCode);
 
 class ConfigHandler
 {

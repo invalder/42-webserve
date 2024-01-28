@@ -20,6 +20,15 @@ std::string createHtmlResponse(int statusCode, const std::string &htmlContent)
 	return response.str();
 }
 
+std::string createHtmlResponseOnlyHead(int statusCode)
+{
+	std::ostringstream response;
+	response << "HTTP/1.1 " << statusCode << " " << getHttpStatusString(statusCode) << "\r\n"
+			 << "Content-Type: text/html\r\n"
+			 << "Content-Length: " << 0 << "\r\n\r\n";
+	return response.str();
+}
+
 const Location *ConfigHandler::matchRequestToLocation(std::string requestPath, Server *server) const
 {
 	// Iterate through locations to find a match

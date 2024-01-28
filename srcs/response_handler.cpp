@@ -330,7 +330,8 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 
 		try {
 			response = callPythonCgi(args, cgiEnvp);
-			
+			std::cout << BRED << "Response: " << response << RESET << std::endl;
+			return 200;
 		}
 		catch (std::exception &e) {
 			std::cerr << BRED << "Error: " << e.what() << RESET << std::endl;

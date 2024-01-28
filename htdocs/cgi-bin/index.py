@@ -14,8 +14,9 @@ def getPath( directoryName: str ) -> str:
 	for root, dir, files in os.walk(WORKING_DIR):
 		if directoryName in dir:
 			return os.path.join(root, directoryName)
+	return ''
 
-def parseUrl( url: str ) -> tuple[str, dict]:
+def parseUrl( url: str ):
 	''' helper to parse url and return dict
 	'''
 	# parse url
@@ -28,6 +29,102 @@ def parseUrl( url: str ) -> tuple[str, dict]:
 	queryString = urllib.parse.parse_qs(queryString)
 
 	return queryString
+
+def constructResponse( statusCode: int, statusMessage: str, contentType: str, contentLength: int, fileName: str = '', body: str = '' ) -> str:
+	''' helper to construct response
+	'''
+	response = f'HTTP/1.1 {statusCode} {statusMessage}\r\n'
+	response += f'Content-Type: {contentType}\r\n'
+	response += f'Content-Length: {contentLength}\r\n'
+	response += f'Content-Disposition: attachment; filename="{fileName}"\r\n' if fileName else ''
+	response += 'Connection: close\r\n'
+	response += '\r\n'
+	response += body
+
+	return response
+
+def handlePost( filePath: str):
+	''' helper to handle POST request
+	'''
+	with open(filePath, 'w') as f:
+		# get file body from environment variable
+		fileBody = os.environ['BODY']
+
+		# write file body to file
+		f.write( fileBody )
+
+		# get file size
+		fileSize = f.tell()
+
+		# construct response
+		response = constructResponse( 201, 'Created', 'text/plain', fileSize )
+
+		# print response to webserver
+		print(response)
+
+		# exit with status code 0
+		sys.exit(0)
+
+def handleDelete( filePath: str ):
+	''' helper to handle DELETE request
+	'''
+	# check if file exists
+	if not os.path.exists(filePath):
+		print('Cannot remove file: File does not exist')
+		sys.exit(3)
+
+	# check if file is writable
+	if not os.access(filePath, os.W_OK):
+		print('Cannot remove file: File is not writable')
+		sys.exit(4)
+
+	# try to remove file
+	try:
+		os.remove(filePath)
+
+		# construct response
+		response = constructResponse( 200, 'OK', 'text/plain', 0 )
+
+		# print response to webserver
+		print(response)
+
+		# exit with status code 0
+		sys.exit(0)
+
+	except Exception as e:
+		print(f"Error: {e}")
+		raise
+
+def handleGet( filePath: str, fileName: str ):
+	# check if file exists
+	if not os.path.exists(filePath):
+		print('Cannot read file: File does not exist')
+		sys.exit(3)
+
+	# check if file is readable
+	if not os.access(filePath, os.R_OK):
+		print('Cannot read file: File is not readable')
+		sys.exit(4)
+
+	# try to read file and return to webserver
+	try:
+		fileBody = ''
+		with open(filePath, 'r') as f:
+			# read file
+			fileBody = f.read()
+
+			response = constructResponse( 200, 'OK', 'text/plain', len(fileBody), fileName, fileBody )
+
+			# print response to webserver
+			print(response)
+
+			# exit with status code 0
+			sys.exit(0)
+
+	except Exception as e:
+		print(f"Error: {e}")
+		raise
+
 
 def main():
 	''' CGI for create a file
@@ -58,65 +155,13 @@ def main():
 
 	# if method is not DELETE, raise exception to webserver
 	if method == 'POST':
-
-		with open(filePath, 'w') as f:
-			# get file body from environment variable
-			fileBody = os.environ['BODY']
-
-			# write file body to file
-			f.write( fileBody )
+		handlePost( filePath )
 
 	elif method == 'DELETE':
-
-		# check if file exists
-		if not os.path.exists(filePath):
-			print('Cannot remove file: File does not exist')
-			sys.exit(3)
-
-		# check if file is writable
-		if not os.access(filePath, os.W_OK):
-			print('Cannot remove file: File is not writable')
-			sys.exit(4)
-
-		# try to remove file
-		try:
-			os.remove(filePath)
-		except Exception as e:
-			print(f"Error: {e}")
-			raise
+		handleDelete( filePath )
 
 	elif method == 'GET':
-		# check if file exists
-		if not os.path.exists(filePath):
-			print('Cannot read file: File does not exist')
-			sys.exit(3)
-
-		# check if file is readable
-		if not os.access(filePath, os.R_OK):
-			print('Cannot read file: File is not readable')
-			sys.exit(4)
-
-		# try to read file and return to webserver
-		try:
-			fileBody = ''
-			with open(filePath, 'r') as f:
-				# read file
-				fileBody = f.read()
-
-				# construct response
-				response = 'HTTP/1.1 200 OK\r\n'
-				response += 'Content-Type: text/plain\n'
-				response += f'Content-Length: {len(fileBody)}\r\n'
-				response += f'Content-Disposition: attachment; filename="{fileName}"\r\n'
-				response += 'Connection: close\r\n'
-				response += '\r\n'
-
-				# print response to webserver
-				print(response + fileBody)
-
-		except Exception as e:
-			print(f"Error: {e}")
-			raise
+		handleGet( filePath, fileName )
 
 	# exit with status code 2 if method is not DELETE
 	sys.exit(2)

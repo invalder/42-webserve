@@ -1,6 +1,6 @@
 #include "config_handler.hpp"
 
-// move server core here 
+// move server core here
 
 
 void ConfigHandler::bindAndSetSocketOptions() const
@@ -190,7 +190,7 @@ void ConfigHandler::run() const
 					// Matched Server
 					if (matchedServer)
 					{
-						
+
 
 						// if (!matchPort(request, matchedServer)) {
 						// 	continue ;
@@ -200,20 +200,20 @@ void ConfigHandler::run() const
 						resNum = checkLocation(response, request, matchedServer);
 						if (resNum == 1)
 							continue ;
-						
+
 					}
 					else
 					{
 						std::cerr << DEBUG_MSG << "No matching server found" << std::endl;
 
-						// if (request.path.find(".png") != std::string::npos)
-						// {
-						// 	response = createHtmlResponse(200, readHtmlFile(this->_cwd + "/htdocs/error/404_error_page.png"));
-						// }
-						// else
-						// {
+						if (request.path.find(".png") != std::string::npos)
+						{
+							response = createHtmlResponse(200, readHtmlFile(this->_cwd + "/htdocs/error/404_error_page.png"));
+						}
+						else
+						{
 						response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
-						// }
+						}
 					}
 					send(*it, response.c_str(), response.length(), 0);
 				}

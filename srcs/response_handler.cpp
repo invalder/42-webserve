@@ -177,7 +177,7 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 	}
 	else
 	{
-		response = createHtmlResponse(404, getHttpStatusString(404));
+		response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 		return 404;
 	}
 
@@ -242,7 +242,7 @@ std::string getAutoIndex(std::string path, std::string retPath)
 		return createHtmlResponse(200, responseTemp);
 	} else {
 		std::cerr << "Error opening directory: " << path << std::endl;
-		return createHtmlResponse(404, "Not Found");
+		return createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 	}
 }
 
@@ -297,7 +297,7 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 
 			// Check if file exist
 			if (!checkFileExist(fullPath)) {
-				response = createHtmlResponse(404, getHttpStatusString(404));
+				response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 				return 404;
 			}
 			// if file exist, return file
@@ -312,7 +312,7 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 		fullPath = directives["root"] + "/" + directives["default_file"];
 
 		if (!checkFileExist(fullPath)) {
-			response = createHtmlResponse(404, getHttpStatusString(404));
+			response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 			return 404;
 		}
 
@@ -357,7 +357,7 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 		}
 		catch (std::exception &e) {
 			std::cerr << BRED << "Error: " << e.what() << RESET << std::endl;
-			response = createHtmlResponse(500, "Internal Server Error");
+			response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 		}
 
 	}

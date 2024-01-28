@@ -64,7 +64,7 @@
 				fileContent.readAsText(file);
 				fileContent.onload = async (e) => {
 					console.log(e.target.result);
-					await fetch(`http://${local_host}/index/${file.name}`, { 
+					await fetch(`http://${local_host}/index/?file=${file.name}`, { 
 						method: 'POST',
 						body: e.target.result,
 						headers: {
@@ -87,7 +87,7 @@
 
 			console.log(namefileDelete.value)
 
-			await fetch(`http://${local_host}/upload/?file=${namefileDelete.value}`, { 
+			await fetch(`http://${local_host}/index/?file=${namefileDelete.value}`, { 
 				method: 'DELETE',
 			}).then(
 				(response) => { console.log('DELETE status:', response.status) },
@@ -100,7 +100,7 @@
 		const buttonDownload = document.getElementById("buttonDownload");
 
 		setFileName.addEventListener("click", (e) => {
-			buttonDownload.href = `http://${local_host}/upload/?file=${namefileDownload.value}`;
+			buttonDownload.href = `http://${local_host}/index/?file=${namefileDownload.value}`;
 		});
 	</script>
 </body>

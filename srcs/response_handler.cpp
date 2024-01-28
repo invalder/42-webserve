@@ -43,6 +43,19 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 		// dup2(pipeCgi[0], STDIN_FILENO);
 		close(pipeCgi[1]);
 
+		switch (status)
+		{
+			case 1:
+				return createHtmlResponse(500, "Internal Server Error");
+			case 2:
+				return createHtmlResponse(405, "Method Not Allowed");
+			case 3:
+				return createHtmlResponse(404, "File Not Found");
+			case 4:
+				return createHtmlResponse(403, "Forbidden");
+			default:
+				break ;
+		}
 
 		// Check the exit status of the child process
 		if (WIFEXITED(status))
@@ -76,17 +89,8 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 
 		// Close the read end of the pipe
 		close(pipeCgi[0]);
-		switch (status)
-		{
-			case 1:
-				return createHtmlResponse(500, "Internal Server Error");
-			case 2:
-				return createHtmlResponse(405, "Method Not Allowed");
-			default:
-				break ;
-		}
 
-		return createHtmlResponse(200, output);
+		return output.c_str();
 	}
 	else
 	{
@@ -282,14 +286,30 @@ std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::strin
 {
 	std::map<std::string, std::string>	ret;
 
-	ret["FILE_PATH"] = absFilePath;
-	ret["PATH_INFO"] = request.path;
-	ret["REQUEST_METHOD"] = request.method;
-	ret["REQUEST_URI"] = request.path;
-	ret["BODY"] = request.body;
-	ret["CONTENT_TYPE"] = request.headers["Content-Type"];
-	ret["BODY"] = request.body;
+	// remove / from argPath
+	std::string argPath = request.argPath;
+	if (argPath[0] == '/')
+		argPath = argPath.substr(1);
 
+	std::map<std::string, std::string> header = request.headers;
+
+	// loop all key and value in header
+	for (std::map<std::string, std::string>::iterator it = header.begin(); it != header.end(); it++)
+	{
+		std::string key = it->first;
+		std::string value = it->second;
+		std::transform(key.begin(), key.end(), key.begin(), ::toupper);
+		std::replace(key.begin(), key.end(), '-', '_');
+		std::cout << "key: " << key << " value: " << value << std::endl;
+		ret[key] = value;
+	}
+
+	std::cout << "Origin: " << header["Origin"] << std::endl;
+
+	ret["FILE_PATH"] = request.path;
+	ret["REQUEST_METHOD"] = request.method;
+	ret["REQUEST_URI"] = header["Origin"] + request.path;
+	ret["BODY"] = request.body;
 
 	return ret;
 }

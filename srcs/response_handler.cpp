@@ -291,7 +291,18 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 		}
 		else
 		{
+			std::cerr << DEBUG_MSG << "Autoindex File!!!" << std::endl;
+			fullPath = directives["root"] + request.path;
+			std::cerr << DEBUG_MSG << "Full path: " << fullPath << std::endl;
 
+			// Check if file exist
+			if (!checkFileExist(fullPath)) {
+				response = createHtmlResponse(404, getHttpStatusString(404));
+				return 404;
+			}
+			// if file exist, return file
+			response = createFileResponse(200, fullPath);
+			return 200;
 		}
 	}
 

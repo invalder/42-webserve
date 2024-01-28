@@ -1,6 +1,6 @@
 #include "config_handler.hpp"
 
-static std::string callPythonCgi(char * const args[], char * const envp[], unsigned int timeout=0)
+static std::string callPythonCgi(char * const args[], char * const envp[], unsigned int timeout=10)
 {
 	std::cout << BRED << "Args " << args[0] << RESET << std::endl;
 
@@ -36,7 +36,7 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 		// Parent process
 
 		// Close the write end of the pipe, it's not needed
-		
+
 		int status;
 		// Wait for the child process to finish
 		waitpid(pid, &status, 0);
@@ -172,7 +172,7 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 		// matchLocation = root if they share the same default file
 		// or go to cgi or html file
 		return this->execute(matchedLocation, response, request);
-	
+
 	}
 	else
 	{
@@ -183,14 +183,56 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 	return 0;
 }
 
+std::string getAutoIndex(std::string filePath, std::string requestPath)
+{
+	DIR *dir;
+	struct dirent *ent;
+	struct stat fileInfo;
+	std::string fullPath;
+	char timeBuff[20];
+	std::string responseTemp = "<html>\n<head>\n<title>Directory Listing</title>\n</head>\n<body>\n<h1>Index Of ";
+	responseTemp += requestPath;
+	responseTemp += "</h1>\n<table>\n<tr><th>Name</th><th>Last Modified</th><th>Size</th></tr>\n";
+
+	dir = opendir(filePath.c_str());
+	if (dir != NULL) {
+		while ((ent = readdir(dir)) != NULL) {
+			fullPath = filePath + "/" + ent->d_name;
+
+			if(stat(fullPath.c_str(), &fileInfo) == 0) {
+				std::strftime(timeBuff, 20, "%Y-%m-%d %H:%M:%S", std::localtime(&fileInfo.st_mtime));
+
+				responseTemp += "<tr><td><a href=\"";
+				responseTemp += requestPath + "/" + ent->d_name;
+				responseTemp += "\">";
+				responseTemp += ent->d_name;
+				responseTemp += "</a></td><td>";
+				responseTemp += timeBuff;
+				responseTemp += "</td><td>";
+				responseTemp += formatSize(fileInfo.st_size);
+				responseTemp += "</td></tr>\n";
+			}
+		}
+		closedir(dir);
+		responseTemp += "</table>\n</body>\n</html>";
+		return createHtmlResponse(200, responseTemp);
+	} else {
+		std::cerr << "Error opening directory: " << filePath << std::endl;
+		return createHtmlResponse(404, "Not Found");
+	}
+}
+
 int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpRequest request) const
 {
 	std::cout << SVMSG << "execute" << std::endl;
 	std::map<std::string, std::string> directives = mLoc->directives;
 	std::string fullPath;
+	std::string reqPath;
 
-	std::cout << "argPath: " << request.argPath.length() << std::endl; 
-	std::cout << "argPath: " << request.argPath << std::endl; 
+	std::cout << DEBUG_MSG << "argPath: " << request.argPath.length() << std::endl;
+	std::cout << DEBUG_MSG << "argPath: " << request.argPath << std::endl;
+
+	std::cout << DEBUG_MSG << "request.path: " << request.path << std::endl;
 
 	// if request has no path argument, get default file and return
 	if (request.argPath.length() == 0)
@@ -201,23 +243,50 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 			response = createHtmlResponse(404, getHttpStatusString(404));
 			return 404;
 		}
-		response = createHtmlResponse(200, readHtmlFile(fullPath));
-		return 200;	
+
+		reqPath = fullPath + request.path;
+
+		// std::cerr << DEBUG_MSG << "reqPath: " << reqPath << std::endl;
+
+		struct stat s;
+		if (stat(reqPath.c_str(), &s) == 0)
+		{
+			if (s.st_mode & S_IFDIR)
+			{
+				// it's a directory
+				response = getAutoIndex(reqPath, reqPath);
+			}
+			else
+				response = createHtmlResponse(200, readHtmlFile(fullPath));
+		}
+		return 200;
 	}
 
 	// otherwise, call cgi
-	else 
+	else
 	{
 		std::map<std::string, std::string>	cgiMap = mLoc->cgi;
 		std::map<std::string, std::string>	uploadMap = mLoc->upload;
-	
+
+		// std::cerr << DEBUG_MSG << "Checking CGI" << std::endl
+		// 	<< "requestPath" << request.requestPath << std::endl;
+
 		// call cgi for the location
-		std::string	cgiPath = directives["root"] + "/cgi-bin" + request.requestPath + cgiMap["extension"];
+		std::string	cgiPath = "";
+
+		if (request.requestPath != "/cgi-bin")
+			cgiPath = directives["root"] + "/cgi-bin" + request.requestPath + cgiMap["extension"];
+		else
+			cgiPath = directives["root"] + request.requestPath + "/" + request.argPath;
+
 		std::string	execPath = cgiMap["executable"];
 		std::string	absFilePath = directives["root"] + "/upload/" + request.argPath;
 
+		// std::cerr << DEBUG_MSG << "cgiPath: " << cgiPath << std::endl;
+		// std::cerr << DEBUG_MSG << "execPath: " << execPath << std::endl;
+		// std::cerr << DEBUG_MSG << "absFilePath: " << absFilePath << std::endl;
 
-		// create envp 
+		// create envp
 		std::map<std::string, std::string>	cgiEnvpMap = createCgiEnvp(directives["root"], absFilePath, request);
 		// to exec cgi
 
@@ -270,12 +339,12 @@ std::string	createRedirectResponse(Location const *mLoc)
 
 	newAdd = newAdd.substr(newAdd.find(" "));
 
-	tmpRes << "HTTP/1.1 301 " << getHttpStatusString(301) << "\r\n" 
+	tmpRes << "HTTP/1.1 301 " << getHttpStatusString(301) << "\r\n"
 			<< "Location: " << newAdd << "\r\n"
 			<< "Content-Type: text/html; charset=UTF-8" << "\r\n"
 			<< "Content-Length: 0"
 			<< "\r\n\r\n";
-	
+
 	// can redirect to another url
 	// make redirect to another page in server
 
@@ -355,7 +424,7 @@ std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::strin
 // 			}
 // 			else
 // 			{
-// 				// check redirect 
+// 				// check redirect
 // 				std::map<std::string, std::string>::const_iterator itret = matchedLocation->directives.find("return:");
 // 				if (itret != matchedLocation->directives.end())
 // 				{
@@ -363,8 +432,8 @@ std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::strin
 // 					std::string		tmp;
 // 					tmp = itret->second;
 // 					tmp = tmp.substr(4);
-// 					tmpRes << "HTTP/1.1 " << "301 " << getHttpStatusString(301) << "\r\n" 
-// 						<< "Location: " << tmp << "\r\n" 
+// 					tmpRes << "HTTP/1.1 " << "301 " << getHttpStatusString(301) << "\r\n"
+// 						<< "Location: " << tmp << "\r\n"
 // 						<<  "Content-Type: text/html\r\n"
 // 						<< "Content-Length: 0\r\n"
 // 						<< "Connection: close\r\n\r\n";
@@ -592,13 +661,13 @@ std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::strin
 // 			std::map<std::string, std::string> cgiEnvpMap;
 // 			std::string fileName;
 // 			std::string absoluteFilePath;
-			
+
 // 			if (request.method == "DELETE")
 // 			{
 // 				// std::cout << "TEST PRINT LOC ======" << matchedLocation->path << std::endl;
 // 				// cx if DELETE allow
 // 				// where am i???
-				
+
 // 				// get file name from request.path (request.path = /upload/?file=filename)
 // 				fileName = request.path.substr(request.path.find("file=") + 5);
 // 				absoluteFilePath = rootDir + "/upload/" + fileName;
@@ -614,7 +683,7 @@ std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::strin
 // 			}
 // 			// Construct absolute file path
 // 			absoluteFilePath = rootDir + "/upload/" + fileName;
-			
+
 // 			// get cgi file name
 // 			std::string cgiFileName = getCgiFileName(request.method);
 // 			std::string filePath = rootDir + "/cgi-bin" + cgiFileName;

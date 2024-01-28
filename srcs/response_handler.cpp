@@ -213,8 +213,6 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 		std::string	absFilePath = directives["root"] + "/upload/" + request.argPath;
 
 
-		std::cout << BRED << " CGI PATH =  " << cgiPath << RESET << std::endl;
-		std::cout << BRED << " DIR ROOT =  " << directives["root"] << RESET << std::endl;
 		// create envp 
 		std::map<std::string, std::string>	cgiEnvpMap = createCgiEnvp(directives["root"], absFilePath, request);
 		// to exec cgi
@@ -232,12 +230,7 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 			response = createHtmlResponse(500, "Internal Server Error");
 		}
 
-
 	}
-
-
-
-
 
 	return 0;
 }
@@ -292,6 +285,7 @@ std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::strin
 	ret["FILE_PATH"] = absFilePath;
 	ret["PATH_INFO"] = request.path;
 	ret["REQUEST_METHOD"] = request.method;
+	ret["REQUEST_URI"] = request.path;
 	ret["BODY"] = request.body;
 	ret["CONTENT_TYPE"] = request.headers["Content-Type"];
 	ret["BODY"] = request.body;
@@ -356,7 +350,6 @@ std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::strin
 // 						<< "Connection: close\r\n\r\n";
 // 					response = tmpRes.str();
 
-// 					std::cout << "TEST-4444 response |" << response << "| end" << std::endl;
 // 					return 301;
 // 				}
 

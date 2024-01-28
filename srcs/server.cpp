@@ -175,7 +175,6 @@ void ConfigHandler::run() const
 				char buffer[4096];
 				ssize_t bytesReceived = recv(*it, buffer, sizeof(buffer), 0);
 
-				std::cout << BGRN << SVMSG << "WHAT WE GOT" << RESET << std::endl;
 				std::cout << "Buffer: " << buffer << std::endl;
 				std::cout << "END " << std::endl;
 
@@ -192,7 +191,6 @@ void ConfigHandler::run() const
 					if (matchedServer)
 					{
 						
-						std::cerr << "\033[1;31m" << "Matched server: " << matchedServer << "\033[0m" << std::endl;
 
 						// if (!matchPort(request, matchedServer)) {
 						// 	continue ;
@@ -217,7 +215,6 @@ void ConfigHandler::run() const
 						response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 						// }
 					}
-					std::cout << "TEST-9999 RESPONSE == " << response << std::endl;
 					send(*it, response.c_str(), response.length(), 0);
 				}
 				else if (bytesReceived == 0)

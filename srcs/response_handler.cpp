@@ -5,7 +5,7 @@ static bool							checkMethod(Location const *, t_HttpRequest);
 static bool 						checkRedirect(Location const *, std::string &);
 int									execute(Location const *, std::string &, t_HttpRequest);
 std::map<std::string, std::string>	createCgiEnvp(std::string, std::string, t_HttpRequest);
-int									getResponseCode(std::string);
+int									getResponseCode(std::string, std::string &);
 
 static std::string callPythonCgi(char * const args[], char * const envp[], unsigned int timeout=10)
 {
@@ -96,9 +96,16 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 		// Close the read end of the pipe
 		close(pipeCgi[0]);
 
-		std::cout << BRED << "Response: " << output << RESET << std::endl;
-		int code = getResponseCode(output);
-		std::cout << BRED << "Code: " << code << RESET << std::endl;
+		// create response if not find attachment
+		size_t pos = output.find("attachment");
+		if (pos == std::string::npos) 
+		{
+			// get code from response
+			std::string message;
+			int code = getResponseCode(output, message);
+			return createHtmlResponse(code, message);
+		}
+
 		return output.c_str();
 	}
 	else
@@ -330,8 +337,10 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 
 		try {
 			response = callPythonCgi(args, cgiEnvp);
-			std::cout << BRED << "Response: " << response << RESET << std::endl;
-			return 200;
+
+			std::string message;
+			int code = getResponseCode(response, message);
+			return code;
 		}
 		catch (std::exception &e) {
 			std::cerr << BRED << "Error: " << e.what() << RESET << std::endl;
@@ -419,26 +428,24 @@ std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::strin
 	return ret;
 }
 
-int getResponseCode(std::string response)
+int getResponseCode(std::string response, std::string &message)
 {
-	std::cout << BBLU << "Response: " << response << RESET << std::endl;
 	// get beginning of code
-	size_t start = response.find("HTTP/1.1 ");
-
-	if (start == std::string::npos)
-		return 0;
+	size_t start = response.find(" ", response.find("HTTP/1.1 "));
 
 	// get end of code
-	size_t end = response.find("OK\r\n", start);
+	size_t end = response.find(" ", start);
 
-	if (end == std::string::npos)
+	if (start == std::string::npos || end == std::string::npos)
 		return 0;
 
 	// get code
-	std::string code = response.substr(start + 9, end - start - 9);
-	std::cout << BBLU << "Code: " << code << RESET << std::endl;
+	std::string code = response.substr(start + 1, 3);
 
-	// std::string code = response.substr(response.find("HTTP/1.1 ") + 1);
-	// code = code.substr(0, code.find(" "));
+	// get message length
+	size_t endMessage = response.find("\r\n", end);
+		
+	message = response.substr(start + 5, endMessage - start - 5);
+
 	return std::atoi(code.c_str());
 }

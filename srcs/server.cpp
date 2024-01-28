@@ -179,21 +179,31 @@ void ConfigHandler::run() const
 					std::string requestString(buffer, bytesReceived);
 					// check host and path
 					t_HttpRequest request = parseHttpRequest(requestString);
+
 					Server *matchedServer = matchRequestToServer(request, _httpConfig.servers);
 
-					// Matched Server
+					std::map<std::string, std::string> httpDirectives = _httpConfig.directives;
 					if (matchedServer)
 					{
+						size_t bodyLimit = atoi(httpDirectives["client_body_limit"].c_str());
+						size_t bodySize = request.body.length();
 
+						// Check Body Limit
+						if (bodySize > bodyLimit)
+						{
+							response = createHtmlResponse(413, "Content too large");
+						}
+						else
+						{
+							// if (!matchPort(request, matchedServer)) {
+							// 	continue ;
+							// }
 
-						// if (!matchPort(request, matchedServer)) {
-						// 	continue ;
-						// }
-
-						// If Server Matched, Check Location ...
-						resNum = checkLocation(response, request, matchedServer);
-						if (resNum == 1)
-							continue ;
+							// If Server Matched, Check Location ...
+							resNum = checkLocation(response, request, matchedServer);
+							if (resNum == 1)
+								continue ;
+						}
 
 					}
 					else
@@ -209,6 +219,9 @@ void ConfigHandler::run() const
 						response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
 						}
 					}
+
+					std::cout << "response: " << response << std::endl;
+					// Send response
 					send(*it, response.c_str(), response.length(), 0);
 				}
 				else if (bytesReceived == 0)

@@ -69,7 +69,6 @@ void ConfigHandler::bindAndSetSocketOptions() const
 			continue;
 		}
 		std::cerr << std::endl; // Add a newline for readability between servers
-		std::cerr << DEBUG_MSG << "Listening on port " << (*serverIt)->directives["listen"] << std::endl;
 	}
 }
 
@@ -113,8 +112,6 @@ void ConfigHandler::run() const
 	signal(SIGINT, signalHandler);
 	signal(SIGTERM, signalHandler);
 	signal(SIGQUIT, signalHandler);
-
-	std::cerr << DEBUG_MSG << "Executing config" << std::endl;
 
 	fd_set readfds;
 	std::vector<int> activeSockets;
@@ -174,9 +171,6 @@ void ConfigHandler::run() const
 			{
 				char buffer[4096];
 				ssize_t bytesReceived = recv(*it, buffer, sizeof(buffer), 0);
-
-				std::cout << "Buffer: " << buffer << std::endl;
-				std::cout << "END " << std::endl;
 
 				if (bytesReceived > 0)
 				{

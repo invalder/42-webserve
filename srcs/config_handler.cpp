@@ -24,7 +24,6 @@ ConfigHandler::ConfigHandler(std::string fileName)
 
 	this->_cwd = cwd;
 
-	std::cout << "CWD: " << this->_cwd << std::endl;
 	// get infile stream from file name
 
 	// read file and construct to config data map
@@ -80,7 +79,6 @@ static inline int splitKeyValue(std::string line, std::string &key, std::string 
 	if (semicolonPos == std::string::npos || semicolonPos == 0)
 	{
 		// Not a valid directive line
-		// std::cerr << "Not Valid semicolonPos: " << std::endl;
 		return 1;
 	}
 
@@ -95,7 +93,7 @@ static inline int splitKeyValue(std::string line, std::string &key, std::string 
 		spacePos = line.find(" ");
 		if (spacePos == std::string::npos)
 		{
-			std::cerr << DEBUG_MSG << "Not Valid spacePos: " << std::endl;
+			// std::cerr << DEBUG_MSG << "Not Valid spacePos: " << std::endl;
 			return 1;
 		}
 	}
@@ -163,7 +161,6 @@ static inline void parseAddMap(std::ifstream &file, std::map<std::string, std::s
 			}
 			toAdd[key] = value;
 		}
-		std::cout << DEBUG_MSG << "QWERTY " << "KEY: " << key << " VALUE: " << value << std::endl;
 	}
 }
 
@@ -279,7 +276,6 @@ void parseHttpDirectives(std::string line, HTTPConfig &httpConfig)
 	// Store the key-value pair in the directives map
 	if (!key.empty() && !value.empty())
 	{
-		// std::cerr << "Adding directive " << key << " with value " << value << std::endl;
 		httpConfig.directives[key] = value;
 	}
 }
@@ -289,27 +285,25 @@ void parseServerDirectives(std::string line, Server *currentServer, std::string 
 {
 	// Trim any leading and trailing whitespace from the line
 	trim(line);
-	// std::cerr << "Trimmed line1: " << line << std::endl;
 	// Check if the line is a valid directive (must contain at least one space and end with a semicolon)
 	size_t semicolonPos = line.rfind(";");
 	if (semicolonPos == std::string::npos || semicolonPos == 0)
 	{
 		// Not a valid directive line
-		std::cerr << DEBUG_MSG << "Not Valid semicolonPos: " << std::endl;
+		// std::cerr << DEBUG_MSG << "Not Valid semicolonPos: " << std::endl;
 		return;
 	}
 
 	// Extract the directive (excluding the semicolon)
 	std::string directive = line.substr(0, semicolonPos);
 	trim(directive);
-	// std::cerr << "Trimmed directive: " << directive << std::endl;
 
 	// Find the space between the key and the value
 	size_t spacePos = directive.find(": ");
 	if (spacePos == std::string::npos)
 	{
 		// No space found, so it's not a key-value pair
-		std::cerr << DEBUG_MSG << "Not Valid spacePos: " << std::endl;
+		// std::cerr << DEBUG_MSG << "Not Valid spacePos: " << std::endl;
 		return;
 	}
 
@@ -327,13 +321,12 @@ void parseServerDirectives(std::string line, Server *currentServer, std::string 
 		if (key == "root") {
 			value = cwd + value;
 		}
-		std::cerr << DEBUG_MSG << "Adding directive " << key << " with value " << value << std::endl;
 		currentServer->directives[key] = value;
 	}
 }
 
 
-t_HttpRequest parseHttpRequest(std::string requestString)
+t_HttpRequest ConfigHandler::parseHttpRequest(std::string requestString) const
 {
 	t_HttpRequest request;
 	std::istringstream requestStream(requestString);
@@ -383,8 +376,6 @@ t_HttpRequest parseHttpRequest(std::string requestString)
 				request.body += "\n"; // Maintain line breaks in body
 			}
 		}
-
-		std::cout << BMAG << "BODY: " << request.body << RESET << std::endl;
 	}
 
 	return request;
@@ -402,8 +393,6 @@ t_HttpRequest parseHttpRequest(std::string requestString)
  */
 HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string &filename)
 {
-	// std::cerr << "Parsing " << filename << std::endl;
-
 	// Check if the file extension is .conf
 	std::string extension = filename.substr(filename.find_last_of(".") + 1);
 	if (extension != "conf")
@@ -432,20 +421,17 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string &filename)
 		// Skip if line starts with '#'
 		if (line[startPos] == '#')
 		{
-			// std::cerr << "Found comment" << std::endl;
 			continue;
 		}
 
 		if (line.find("http {") != std::string::npos)
 		{
-			// std::cerr << "Found http block" << std::endl;
 			insideHttp = true;
 			continue;
 		}
 
 		if (insideHttp && line.find("server {") != std::string::npos)
 		{
-			// std::cerr << "Found server block" << std::endl;
 			insideServer = true;
 			currentServer = new Server();
 			continue;
@@ -453,7 +439,6 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string &filename)
 
 		if (insideServer && line.find("}") != std::string::npos)
 		{
-			// std::cerr << "Found closing bracket" << std::endl;
 			insideServer = false;
 			_httpConfig.servers.push_back(currentServer);
 			continue;
@@ -474,7 +459,6 @@ HTTPConfig ConfigHandler::_parseHTTPConfig(const std::string &filename)
 		if (insideServer)
 		{
 			// Parse server directives similarly. For simplicity, we won't handle location blocks here.
-			// std::cerr << "Parsing server directive" << line << std::endl;
 			if (currentServer && line.find("location ") != std::string::npos && line.find(" {") != std::string::npos)
 			{
 				parseLocationConfig(file, currentServer, line, this->_cwd);
@@ -503,7 +487,6 @@ void ConfigHandler::printServerDirectives() const
 	// Loop over each server in the configuration
 	for (std::vector<Server *>::const_iterator serverIt = _httpConfig.servers.begin(); serverIt != _httpConfig.servers.end(); ++serverIt)
 	{
-		// std::cerr << "Server Name: " << serverIt->server_names << std::endl;
 		std::cerr << "-------------------------------------------" << std::endl;
 		// Now loop over the directives for this server
 		for (std::map<std::string, std::string>::const_iterator directiveIt = (*serverIt)->directives.begin(); directiveIt != (*serverIt)->directives.end(); ++directiveIt)
@@ -533,8 +516,7 @@ void ConfigHandler::printHTTPDirectives() const
 bool ConfigHandler::checkFileExist(std::string path) const
 {
 	std::ifstream file(path.c_str());
-	std::cerr << DEBUG_MSG << "Check file exist: " << path << std::endl;
-	std::cerr << DEBUG_MSG << "Check file exist: " << file.good() << std::endl;
+	
 	if (file.good())
 	{
 		return true;

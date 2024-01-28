@@ -34,8 +34,6 @@
 
 extern char **environ;
 
-#define SVMSG "[SV-MSG] "
-
 typedef struct s_HttpRequset
 {
 	std::string method;
@@ -89,12 +87,19 @@ class HTTPConfig {
 		// ~HTTPConfig();
 };
 
+std::string		getHttpStatusString(int statusCode);
+void			timeoutHandler(int signum);
+std::string		formatSize(size_t size);
+std::string		createHtmlResponse(int statusCode, const std::string &htmlContent);
+std::string		createFileResponse(int statusCode, const std::string &filePath);
+char * const	*createCgiEnvp( const std::map<std::string, std::string> &cgiEnv );
+std::string		readHtmlFile(const std::string &filePath);
+
 class ConfigHandler
 {
 	private:
 		std::string _data;
 
-		std::string _cwd;
 
 		mutable std::vector<int> _boundPorts;
 
@@ -115,6 +120,8 @@ class ConfigHandler
 		// bool		matchPort(t_HttpRequest request, Server *matchedServer);
 
 	public:
+		std::string _cwd;
+		
 		ConfigHandler();
 		ConfigHandler( std::string );
 		~ConfigHandler();
@@ -144,6 +151,15 @@ class ConfigHandler
 		void	closePorts() const;
 
 		int		checkLocation(std::string &response, t_HttpRequest request, Server *matchedServer) const;
+		t_HttpRequest	parseHttpRequest(std::string requestString) const;
+
+		// Utility
+
+		std::string		getCgiFileName(std::string method);
+		Server			*matchRequestToServer(const t_HttpRequest &request, const std::vector<Server *> &servers) const;
+
+		const Location	*matchRequestToLocation(std::string requestPath, Server *server) const;
+		std::string 	getAutoIndex(std::string path, std::string retPath) const;
 	// exceptions
 	// file open exception
 	class FileOpenException : public std::exception
@@ -161,20 +177,6 @@ class ConfigHandler
 };
 
 
-t_HttpRequest	parseHttpRequest(std::string requestString);
-
-// Utility
-
-std::string		getCgiFileName(std::string method);
-std::string		createHtmlResponse(int statusCode, const std::string &htmlContent);
-const Location	*matchRequestToLocation(std::string requestPath, Server *server);
-Server			*matchRequestToServer(const t_HttpRequest &request, const std::vector<Server *> &servers);
-std::string		readHtmlFile(const std::string &filePath);
-std::string		getHttpStatusString(int statusCode);
-std::string		formatSize(size_t size);
-void			timeoutHandler(int signum);
-char * const	*createCgiEnvp( const std::map<std::string, std::string> &cgiEnv );
-std::string		createFileResponse(int statusCode, const std::string &filePath);
 
 
 #endif

@@ -19,11 +19,10 @@ OBJS = $(SRCS:.cpp=.o)
 INCS = -Iincludes/
 
 SRCS = config_handler.cpp \
-	main.cpp \
-	server.cpp \
 	response_handler.cpp \
+	server.cpp \
 	utility.cpp \
-	forTest.cpp 
+	main.cpp
 
 DBG = *.dSYM
 

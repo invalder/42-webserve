@@ -1,6 +1,6 @@
 #include "config_handler.hpp"
 
-std::string getCgiFileName(std::string method) {
+std::string ConfigHandler::getCgiFileName(std::string method) {
 	if (method == "POST") {
 		return "/upload.py";
 	}
@@ -20,10 +20,8 @@ std::string createHtmlResponse(int statusCode, const std::string &htmlContent)
 	return response.str();
 }
 
-const Location *matchRequestToLocation(std::string requestPath, Server *server)
+const Location *ConfigHandler::matchRequestToLocation(std::string requestPath, Server *server) const
 {
-	std::cerr << DEBUG_MSG << "Requested path: " << requestPath << std::endl;
-
 	// Iterate through locations to find a match
 	for (std::vector<Location>::const_iterator it = server->locations.begin(); it != server->locations.end(); ++it)
 	{
@@ -33,15 +31,11 @@ const Location *matchRequestToLocation(std::string requestPath, Server *server)
 		if (requestPath == location.path)
 		{
 			// Found a matching location
-			// Return the address of the location in the vector
-			// std::cerr << "requestedPath: " << requestedPath << std::endl;
-			// std::cerr << "Found matching location: " << location.path << std::endl;
 			return &(*it);
 		}
 	}
 
 	// No matching location found
-	// std::cerr << "No matching location found" << std::endl;
 	return 0;
 }
 
@@ -52,13 +46,12 @@ const Location *matchRequestToLocation(std::string requestPath, Server *server)
 
 
 // Function to match the request to a server
-Server *matchRequestToServer(const t_HttpRequest &request, const std::vector<Server *> &servers)
+Server *ConfigHandler::matchRequestToServer(const t_HttpRequest &request, const std::vector<Server *> &servers) const
 {
 	std::string requestedHost;
 
 	// Find the "Host" header in a const-safe manner
 	std::map<std::string, std::string>::const_iterator itHost = request.headers.find("Host");
-	std::cerr << "\033[1;31m" << DEBUG_MSG << "Request headers: " << itHost->first << ": " << itHost->second << "\033[0m" << std::endl;
 	if (itHost != request.headers.end())
 	{
 		requestedHost = itHost->second;
@@ -109,14 +102,9 @@ Server *matchRequestToServer(const t_HttpRequest &request, const std::vector<Ser
 
 std::string readHtmlFile(const std::string &filePath)
 {
-
-	std::cerr << DEBUG_MSG << "Read HTML file path: " << filePath << std::endl;
-
 	std::ifstream htmlFile(filePath.c_str());
 	std::ostringstream buffer;
 	buffer << htmlFile.rdbuf();
-
-	// std::cerr << DEBUG_MSG << "Read HTML file: " << buffer.str() << std::endl;
 
 	return buffer.str();
 }
@@ -170,7 +158,6 @@ void timeoutHandler(int signum) {
 	if (signum == SIGALRM) {
 		std::cerr << BRED <<  "Timeout reached. The child process took too long to execute." << RESET << std::endl;
 		exit(_POSIX_TIMEOUTS);
-	
 	}
 }
 
@@ -185,7 +172,6 @@ char * const *createCgiEnvp( const std::map<std::string, std::string> &cgiEnv )
 	{
 		std::string envVar = it->first + "=" + it->second;
 		// print envVar in green
-		std::cerr << "\033[1;32m" << "envVar: " << envVar << "\033[0m" << std::endl;
 		envp[i] = new char[envVar.length() + 1];
 		strcpy(envp[i], envVar.c_str());
 		i++;

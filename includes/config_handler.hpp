@@ -34,6 +34,8 @@
 
 extern char **environ;
 
+#define SVMSG "[SV-MSG] "
+
 typedef struct s_HttpRequset
 {
 	std::string method;
@@ -130,6 +132,7 @@ class ConfigHandler
 		void	bindAndSetSocketOptions() const;
 
 		void	run() const;
+		int		execute(Location const *mLoc, std::string &response, t_HttpRequest request) const;
 
 		// ===== ForTest Remove Bofore Push =====
 		void	testPrintAll() const;

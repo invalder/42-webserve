@@ -2,6 +2,7 @@
 
 static std::string callPythonCgi(char * const args[], char * const envp[], unsigned int timeout=0)
 {
+	std::cout << BRED << "Args " << args[0] << RESET << std::endl;
 
 	// Set up pipes for communication
 	int pipeCgi[2];
@@ -12,11 +13,11 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 	{
 		// Child process
 
-		// Close the read end of the pipe, it's not needed
-		close(pipeCgi[0]);
-
 		// Redirect stdout to the write end of the pipe
 		dup2(pipeCgi[1], STDOUT_FILENO);
+		// Close the read end of the pipe, it's not needed
+		close(pipeCgi[0]);
+		close(pipeCgi[1]);
 
 		// catch signal for timeout
 		signal(SIGALRM, timeoutHandler);
@@ -35,19 +36,13 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 		// Parent process
 
 		// Close the write end of the pipe, it's not needed
-		close(pipeCgi[1]);
-
+		
 		int status;
 		// Wait for the child process to finish
 		waitpid(pid, &status, 0);
+		// dup2(pipeCgi[0], STDIN_FILENO);
+		close(pipeCgi[1]);
 
-		switch (status)
-		{
-			case 1:
-				return createHtmlResponse(500, "Internal Server Error");
-			case 2:
-				return createHtmlResponse(405, "Method Not Allowed");
-		}
 
 		// Check the exit status of the child process
 		if (WIFEXITED(status))
@@ -81,6 +76,15 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 
 		// Close the read end of the pipe
 		close(pipeCgi[0]);
+		switch (status)
+		{
+			case 1:
+				return createHtmlResponse(500, "Internal Server Error");
+			case 2:
+				return createHtmlResponse(405, "Method Not Allowed");
+			default:
+				break ;
+		}
 
 		return createHtmlResponse(200, output);
 	}
@@ -92,9 +96,11 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 }
 
 // prototype of helper funciton
-static bool	checkMethod(Location const *, t_HttpRequest);
-static bool checkRedirect(Location const *, std::string &);
-int			execute(Location const *, std::string &, t_HttpRequest);
+static bool							checkMethod(Location const *, t_HttpRequest);
+static bool 						checkRedirect(Location const *, std::string &);
+int									execute(Location const *, std::string &, t_HttpRequest);
+std::map<std::string, std::string>	createCgiEnvp(std::string, std::string, t_HttpRequest);
+
 
 std::string	createRedirectResponse(Location const *);
 
@@ -105,31 +111,40 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 	// find second slash
 	size_t slashPos = request.path.find("/", 1);
 	// get request path until second slash
-	request.requestPath = request.path.substr(0, slashPos + 1);
+
+	std::cout << "request.path" << request.path << std::endl;
+	request.requestPath = request.path.substr(0, slashPos);
+	std::cout << "request.requestPath" << request.requestPath << std::endl;
 	// get arg path after second slash else empty string
 	request.argPath = request.path.substr(slashPos + 1);
+	if (request.argPath == request.requestPath)
+		request.argPath = "";
+	std::cout << "request.argPath" << request.argPath << std::endl;
+
+	// locahost/index/454
 
 	const Location *matchedLocation = matchRequestToLocation(request.requestPath, matchedServer);
 	std::cout << BCYN << "Matched location: " << matchedLocation << RESET << std::endl;
 
-	std::string svmsg = "[SV-MSG] ";
+	// std::string svmsg = "[SV-MSG] ";
 	if (matchedLocation)
 	{
-		std::cout << svmsg << "Location Matched" << std::endl;
+		std::cout << SVMSG << "Location Matched" << std::endl;
 		// cx method
-		std::cout << svmsg << "Checking method" << std::endl;
+		std::cout << SVMSG << "Checking method" << std::endl;
 		if (checkMethod(matchedLocation, request))
 		{
-			std::cout << svmsg << "Method NOT ALLOW" << std::endl;
+			std::cout << SVMSG << "Method NOT ALLOW" << std::endl;
 			response = createHtmlResponse(405, getHttpStatusString(405));
 			return 405;
 		}
-		std::cout << svmsg << "Method OK" << std::endl;
+		std::cout << SVMSG << "Method OK" << std::endl;
 		// cx redirect
 		if (checkRedirect(matchedLocation, response))
 		{
 			// add new to response
 			response = createRedirectResponse(matchedLocation);
+			std::cout << SVMSG << "Returning 301 response" << std::endl;
 			return 301;
 		}
 		// find root location
@@ -148,11 +163,11 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 
 		if (matchedDefaultFile == rootDefaultFile)
 		{
-			return execute(const_cast<Location *>(&rootLocation), response, request);
+			return this->execute(const_cast<Location *>(&rootLocation), response, request);
 		}
 		// matchLocation = root if they share the same default file
 		// or go to cgi or html file
-		return execute(matchedLocation, response, request);
+		return this->execute(matchedLocation, response, request);
 	
 	}
 	else
@@ -164,9 +179,66 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 	return 0;
 }
 
-int		execute(Location const *mLoc, std::string &response, t_HttpRequest request)
+int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpRequest request) const
 {
-	std::cout << "TEST" << std::endl;
+	std::cout << SVMSG << "execute" << std::endl;
+	std::map<std::string, std::string> directives = mLoc->directives;
+	std::string fullPath;
+
+	std::cout << "argPath: " << request.argPath.length() << std::endl; 
+	std::cout << "argPath: " << request.argPath << std::endl; 
+
+	// if request has no path argument, get default file and return
+	if (request.argPath.length() == 0)
+	{
+		fullPath = directives["root"] + "/" + directives["default_file"];
+
+		if (!checkFileExist(fullPath)) {
+			response = createHtmlResponse(404, getHttpStatusString(404));
+			return 404;
+		}
+		response = createHtmlResponse(200, readHtmlFile(fullPath));
+		return 200;	
+	}
+
+	// otherwise, call cgi
+	else 
+	{
+		std::map<std::string, std::string>	cgiMap = mLoc->cgi;
+		std::map<std::string, std::string>	uploadMap = mLoc->upload;
+	
+		// call cgi for the location
+		std::string	cgiPath = directives["root"] + "/cgi-bin" + request.requestPath + cgiMap["extension"];
+		std::string	execPath = cgiMap["executable"];
+		std::string	absFilePath = directives["root"] + "/upload/" + request.argPath;
+
+
+		std::cout << BRED << " CGI PATH =  " << cgiPath << RESET << std::endl;
+		std::cout << BRED << " DIR ROOT =  " << directives["root"] << RESET << std::endl;
+		// create envp 
+		std::map<std::string, std::string>	cgiEnvpMap = createCgiEnvp(directives["root"], absFilePath, request);
+		// to exec cgi
+
+		char * const *cgiEnvp = createCgiEnvp(cgiEnvpMap);
+
+		char * const args[] = { (char *)execPath.c_str(), (char *)cgiPath.c_str(), NULL};
+		// char * const args[2] = {const_cast<char *>(filePath.c_str()), NULL};
+
+		try {
+			response = callPythonCgi(args, cgiEnvp);
+		}
+		catch (std::exception &e) {
+			std::cerr << BRED << "Error: " << e.what() << RESET << std::endl;
+			response = createHtmlResponse(500, "Internal Server Error");
+		}
+
+
+	}
+
+
+
+
+
 	return 0;
 }
 
@@ -204,13 +276,29 @@ std::string	createRedirectResponse(Location const *mLoc)
 	tmpRes << "HTTP/1.1 301 " << getHttpStatusString(301) << "\r\n" 
 			<< "Location: " << newAdd << "\r\n"
 			<< "Content-Type: text/html; charset=UTF-8" << "\r\n"
-			<< "Content-Length: 220"
-			<< "\r\nr\n";
+			<< "Content-Length: 0"
+			<< "\r\n\r\n";
 	
+	// can redirect to another url
+	// make redirect to another page in server
 
 	return tmpRes.str();
 }
 
+std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::string absFilePath, t_HttpRequest request)
+{
+	std::map<std::string, std::string>	ret;
+
+	ret["FILE_PATH"] = absFilePath;
+	ret["PATH_INFO"] = request.path;
+	ret["REQUEST_METHOD"] = request.method;
+	ret["BODY"] = request.body;
+	ret["CONTENT_TYPE"] = request.headers["Content-Type"];
+	ret["BODY"] = request.body;
+
+
+	return ret;
+}
 
 // return err code or 0
 // int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, Server *matchedServer) const

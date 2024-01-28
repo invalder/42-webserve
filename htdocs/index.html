@@ -64,7 +64,7 @@
 				fileContent.readAsText(file);
 				fileContent.onload = async (e) => {
 					console.log(e.target.result);
-					await fetch(`http://${local_host}/upload/`, { 
+					await fetch(`http://${local_host}/index/${file.name}`, { 
 						method: 'POST',
 						body: e.target.result,
 						headers: {

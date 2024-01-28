@@ -183,14 +183,77 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 	return 0;
 }
 
+std::string getAutoIndex(std::string path, std::string retPath)
+{
+	DIR *dir;
+	struct dirent *ent;
+	struct stat fileInfo;
+	std::string fullPath;
+	char timeBuff[20];
+	std::string responseTemp = "<html>\n<head>\n<title>Directory Listing</title>\n</head>\n<body>\n<h1>Index Of ";
+	responseTemp += retPath;
+	responseTemp += "</h1>\n<table>\n<tr><th>Name</th><th>Last Modified</th><th>Size</th></tr>\n";
+
+	std::cerr << "retPath: " << retPath << std::endl;
+
+	dir = opendir(path.c_str());
+	if (dir != NULL) {
+		while ((ent = readdir(dir)) != NULL) {
+			fullPath = path + "/" + ent->d_name;
+
+			if(stat(fullPath.c_str(), &fileInfo) == 0) {
+				std::strftime(timeBuff, 20, "%Y-%m-%d %H:%M:%S", std::localtime(&fileInfo.st_mtime));
+
+				responseTemp += "<tr><td><a href=\"";
+				responseTemp += retPath + "/" + ent->d_name;
+				responseTemp += "\">";
+				responseTemp += ent->d_name;
+				responseTemp += "</a></td><td>";
+				responseTemp += timeBuff;
+				responseTemp += "</td><td>";
+				responseTemp += formatSize(fileInfo.st_size);
+				responseTemp += "</td></tr>\n";
+			}
+		}
+		closedir(dir);
+		responseTemp += "</table>\n</body>\n</html>";
+		return createHtmlResponse(200, responseTemp);
+	} else {
+		std::cerr << "Error opening directory: " << path << std::endl;
+		return createHtmlResponse(404, "Not Found");
+	}
+}
+
 int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpRequest request) const
 {
 	std::cout << SVMSG << "execute" << std::endl;
 	std::map<std::string, std::string> directives = mLoc->directives;
 	std::string fullPath;
+	std::string reqPath = request.requestPath;
 
 	std::cout << "argPath: " << request.argPath.length() << std::endl;
 	std::cout << "argPath: " << request.argPath << std::endl;
+
+	// Check if its autoindex
+	if (reqPath == "/autoindex")
+	{
+		// if arg path, it's file. otherwise, directory
+		if (request.argPath.length() == 0)
+		{
+			std::cerr << DEBUG_MSG << "Autoindex" << std::endl;
+			fullPath = directives["root"] + reqPath;
+			std::cerr << DEBUG_MSG << "Full path: " << fullPath << std::endl;
+
+			std::string retPath = reqPath;
+
+			response = getAutoIndex(fullPath, retPath);
+			return 200;
+		}
+		else
+		{
+
+		}
+	}
 
 	// if request has no path argument, get default file and return
 	if (request.argPath.length() == 0)
@@ -201,10 +264,10 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 			response = createHtmlResponse(404, getHttpStatusString(404));
 			return 404;
 		}
+
 		response = createHtmlResponse(200, readHtmlFile(fullPath));
 		return 200;
 	}
-
 	// otherwise, call cgi
 	else
 	{

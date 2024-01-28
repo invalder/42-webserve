@@ -1,5 +1,12 @@
 #include "config_handler.hpp"
 
+// prototype of helper funciton
+static bool							checkMethod(Location const *, t_HttpRequest);
+static bool 						checkRedirect(Location const *, std::string &);
+int									execute(Location const *, std::string &, t_HttpRequest);
+std::map<std::string, std::string>	createCgiEnvp(std::string, std::string, t_HttpRequest);
+int									getResponseCode(std::string);
+
 static std::string callPythonCgi(char * const args[], char * const envp[], unsigned int timeout=10)
 {
 	// Set up pipes for communication
@@ -89,6 +96,9 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 		// Close the read end of the pipe
 		close(pipeCgi[0]);
 
+		std::cout << BRED << "Response: " << output << RESET << std::endl;
+		int code = getResponseCode(output);
+		std::cout << BRED << "Code: " << code << RESET << std::endl;
 		return output.c_str();
 	}
 	else
@@ -97,12 +107,6 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 		return createHtmlResponse(500, "Internal Server Error");
 	}
 }
-
-// prototype of helper funciton
-static bool							checkMethod(Location const *, t_HttpRequest);
-static bool 						checkRedirect(Location const *, std::string &);
-int									execute(Location const *, std::string &, t_HttpRequest);
-std::map<std::string, std::string>	createCgiEnvp(std::string, std::string, t_HttpRequest);
 
 
 std::string	createRedirectResponse(Location const *);
@@ -326,10 +330,12 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 
 		try {
 			response = callPythonCgi(args, cgiEnvp);
+			
 		}
 		catch (std::exception &e) {
 			std::cerr << BRED << "Error: " << e.what() << RESET << std::endl;
 			response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
+			return 404;
 		}
 
 	}
@@ -410,4 +416,28 @@ std::map<std::string, std::string>	createCgiEnvp(std::string rootDir, std::strin
 	ret["BODY"] = request.body;
 
 	return ret;
+}
+
+int getResponseCode(std::string response)
+{
+	std::cout << BBLU << "Response: " << response << RESET << std::endl;
+	// get beginning of code
+	size_t start = response.find("HTTP/1.1 ");
+
+	if (start == std::string::npos)
+		return 0;
+
+	// get end of code
+	size_t end = response.find("OK\r\n", start);
+
+	if (end == std::string::npos)
+		return 0;
+
+	// get code
+	std::string code = response.substr(start + 9, end - start - 9);
+	std::cout << BBLU << "Code: " << code << RESET << std::endl;
+
+	// std::string code = response.substr(response.find("HTTP/1.1 ") + 1);
+	// code = code.substr(0, code.find(" "));
+	return std::atoi(code.c_str());
 }

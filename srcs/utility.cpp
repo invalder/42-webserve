@@ -24,10 +24,11 @@ std::string ConfigHandler::createHtmlTextResponse(int statusCode, const std::str
 std::string ConfigHandler::createHtmlResponse(int statusCode, const std::string &htmlContent) const
 {
 	// find if there are default error page in http scope
-	std::string	codeStr = std::to_string(statusCode);
-	if (_httpConfig.defaultErrorPages.find(codeStr) != _httpConfig.defaultErrorPages.end()) {
+	std::stringstream	ss;
+	ss << statusCode;
+	if (_httpConfig.defaultErrorPages.find(ss.str()) != _httpConfig.defaultErrorPages.end()) {
 		std::map<std::string, std::string>	path = _httpConfig.defaultErrorPages;
-		std::string	ret = createFileResponse(statusCode, path[codeStr]);
+		std::string	ret = createFileResponse(statusCode, path[ss.str()]);
 		if (ret.find("Error: ") == std::string::npos) {
 			return ret;
 		}
@@ -254,7 +255,6 @@ std::string ConfigHandler::createFileResponse(int statusCode, const std::string 
 	std::string extension = getFileExtension(filePath);
 	std::string mimeType = detectMimeType(extension);
 
-	std::cout << BRED << filePath << RESET << std::endl;
 	std::ifstream file(filePath.c_str(), std::ios::binary | std::ios::ate);
 	if(!file.is_open()) {
 		return "Error: Unable to open file";

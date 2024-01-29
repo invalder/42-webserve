@@ -19,9 +19,9 @@ OBJS = $(SRCS:.cpp=.o)
 INCS = -Iincludes/
 
 SRCS = config_handler.cpp \
+	utility.cpp \
 	response_handler.cpp \
 	server.cpp \
-	utility.cpp \
 	main.cpp
 
 DBG = *.dSYM

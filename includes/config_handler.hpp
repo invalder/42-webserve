@@ -35,6 +35,8 @@
 
 extern char **environ;
 
+class ConfigHandler;
+
 typedef struct s_HttpRequset
 {
 	std::string method;
@@ -91,11 +93,10 @@ class HTTPConfig {
 std::string		getHttpStatusString(int statusCode);
 void			timeoutHandler(int signum);
 std::string		formatSize(size_t size);
-std::string		createHtmlResponse(int statusCode, const std::string &htmlContent);
-std::string		createFileResponse(int statusCode, const std::string &filePath);
 char * const	*createCgiEnvp( const std::map<std::string, std::string> &cgiEnv );
 std::string		readHtmlFile(const std::string &filePath);
 std::string 	createHtmlResponseOnlyHead(int statusCode);
+
 
 class ConfigHandler
 {
@@ -140,11 +141,14 @@ class ConfigHandler
 
 		void	bindAndSetSocketOptions() const;
 
+		std::string		createHtmlResponse(int, const std::string &) const;
+		std::string		createHtmlTextResponse(int, const std::string &) const;
+		std::string		createFileResponse(int statusCode, const std::string &filePath) const;
+
 		void	run() const;
 		int		execute(Location const *mLoc, std::string &response, t_HttpRequest request) const;
 
-		// ===== ForTest Remove Bofore Push =====
-		void	testPrintAll() const;
+		std::string		callPythonCgi(char * const args[], char * const envp[], unsigned int timeout) const;
 
 		bool	checkFileExist( std::string ) const;
 		bool	checkImageFile( std::string ) const;

@@ -3,11 +3,12 @@
 // prototype of helper funciton
 static bool							checkMethod(Location const *, t_HttpRequest);
 static bool 						checkRedirect(Location const *, std::string &);
-int									execute(Location const *, std::string &, t_HttpRequest);
+// int									execute(Location const *, std::string &, t_HttpRequest);
 std::map<std::string, std::string>	createCgiEnvp(std::string, std::string, t_HttpRequest);
 int									getResponseCode(std::string, std::string &);
 
-static std::string callPythonCgi(char * const args[], char * const envp[], unsigned int timeout=10)
+
+std::string ConfigHandler::callPythonCgi(char * const args[], char * const envp[], unsigned int timeout=5) const
 {
 	// Set up pipes for communication
 	int pipeCgi[2];
@@ -54,11 +55,11 @@ static std::string callPythonCgi(char * const args[], char * const envp[], unsig
 		switch (status)
 		{
 			case 1:
-				return createHtmlResponse(404, readHtmlFile(std::string(cwd) + "/htdocs/error/500.html"));
+				return createHtmlResponse(404, getHttpStatusString(404));
 			case 2:
 				return createHtmlResponse(405, "Method Not Allowed");
 			case 3:
-				return createHtmlResponse(404, readHtmlFile(std::string(cwd) + "/htdocs/error/404.html"));
+				return createHtmlResponse(404, getHttpStatusString(404));
 			case 4:
 				return createHtmlResponse(403, "Forbidden");
 			default:
@@ -180,7 +181,17 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 	}
 	else
 	{
-		response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
+		// check if request path is image
+		if (checkImageFile(request.path)) {
+			std::string		imgPath = _cwd + "/htdocs/image" + request.path;
+			if (checkFileExist(imgPath))
+				response = createFileResponse(200, imgPath);
+			else
+				response = createHtmlTextResponse(404, getHttpStatusString(404));
+		}
+		else {
+			response = createHtmlResponse(404, getHttpStatusString(404));
+		}
 		return 404;
 	}
 
@@ -239,7 +250,7 @@ std::string ConfigHandler::getAutoIndex(std::string path, std::string retPath) c
 		return createHtmlResponse(200, responseTemp);
 	} else {
 		std::cerr << "Error opening directory: " << path << std::endl;
-		return createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
+		return createHtmlResponse(404, getHttpStatusString(404));
 	}
 }
 
@@ -264,7 +275,6 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 	std::string fullPath;
 	std::string reqPath = request.requestPath;
 
-
 	// Check if its autoindex
 	if (reqPath == "/autoindex")
 	{
@@ -286,7 +296,7 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 
 			// Check if file exist
 			if (!checkFileExist(fullPath)) {
-				response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
+				response = createHtmlResponse(404, getHttpStatusString(404));
 				return 404;
 			}
 			// if file exist, return file
@@ -301,7 +311,7 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 		fullPath = directives["root"] + "/" + directives["default_file"];
 
 		if (!checkFileExist(fullPath)) {
-			response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
+			response = createHtmlResponse(404, getHttpStatusString(404));
 			return 404;
 		}
 
@@ -344,7 +354,7 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 		}
 		catch (std::exception &e) {
 			std::cerr << BRED << "Error: " << e.what() << RESET << std::endl;
-			response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
+			response = createHtmlResponse(404, getHttpStatusString(404));
 			return 404;
 		}
 

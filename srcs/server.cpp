@@ -99,10 +99,6 @@ void ConfigHandler::signalHandler(int signal)
 	exit(0);
 }
 
-// bool	ConfigHandler::matchPort()
-// {
-
-// }
 
 // ============ EXECUTE ================
 
@@ -210,17 +206,17 @@ void ConfigHandler::run() const
 					{
 						std::cerr << DEBUG_MSG << "No matching server found" << std::endl;
 
-						if (request.path.find(".png") != std::string::npos)
-						{
-							response = createHtmlResponse(200, readHtmlFile(this->_cwd + "/htdocs/error/404_error_page.png"));
-						}
-						else
-						{
-						response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
-						}
+						// if (request.path.find(".png") != std::string::npos)
+						// {
+						// 	response = createHtmlResponse(200, readHtmlFile(this->_cwd + "/htdocs/error/404_error_page.png"));
+						// }
+						// else
+						// {
+						// response = createHtmlResponse(404, readHtmlFile(this->_cwd + "/htdocs/error/404.html"));
+						// }
+						response = createHtmlResponse(404, getHttpStatusString(404));
 					}
-
-					std::cout << "response: " << response << std::endl;
+					// std::cout << "response: " << response << std::endl;
 					// Send response
 					send(*it, response.c_str(), response.length(), 0);
 				}
@@ -244,10 +240,3 @@ void ConfigHandler::run() const
 		}
 	}
 }
-
-
-// bool		ConfigHandler::matchPort(t_HttpRequest request, Server *matchedServer)
-// {
-
-// }
-

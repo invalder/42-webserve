@@ -10,7 +10,7 @@ std::string ConfigHandler::getCgiFileName(std::string method) {
 	return "";
 }
 
-std::string createHtmlResponse(int statusCode, const std::string &htmlContent)
+std::string ConfigHandler::createHtmlTextResponse(int statusCode, const std::string &htmlContent) const
 {
 	std::ostringstream response;
 	response << "HTTP/1.1 " << statusCode << " " << getHttpStatusString(statusCode) << "\r\n"
@@ -20,6 +20,22 @@ std::string createHtmlResponse(int statusCode, const std::string &htmlContent)
 	return response.str();
 }
 
+
+std::string ConfigHandler::createHtmlResponse(int statusCode, const std::string &htmlContent) const
+{
+	// find if there are default error page in http scope
+	std::string	codeStr = std::to_string(statusCode);
+	if (_httpConfig.defaultErrorPages.find(codeStr) != _httpConfig.defaultErrorPages.end()) {
+		std::map<std::string, std::string>	path = _httpConfig.defaultErrorPages;
+		std::string	ret = createFileResponse(statusCode, path[codeStr]);
+		if (ret.find("Error: ") == std::string::npos) {
+			return ret;
+		}
+	}
+	return createHtmlTextResponse(statusCode, htmlContent);
+}
+
+
 std::string createHtmlResponseOnlyHead(int statusCode)
 {
 	std::ostringstream response;
@@ -27,6 +43,20 @@ std::string createHtmlResponseOnlyHead(int statusCode)
 			 << "Content-Type: text/html\r\n"
 			 << "Content-Length: " << 0 << "\r\n\r\n";
 	return response.str();
+}
+
+bool	ConfigHandler::checkImageFile(std::string path) const
+{
+	// get file extension
+	std::string extension = path.substr(path.find_last_of(".") + 1);
+	if (extension == "png" || extension == "jpg" || extension == "jpeg" || extension == "gif")
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 const Location *ConfigHandler::matchRequestToLocation(std::string requestPath, Server *server) const
@@ -219,11 +249,12 @@ std::string detectMimeType(const std::string& extension) {
 	}
 }
 
-std::string createFileResponse(int statusCode, const std::string &filePath)
+std::string ConfigHandler::createFileResponse(int statusCode, const std::string &filePath) const
 {
 	std::string extension = getFileExtension(filePath);
 	std::string mimeType = detectMimeType(extension);
 
+	std::cout << BRED << filePath << RESET << std::endl;
 	std::ifstream file(filePath.c_str(), std::ios::binary | std::ios::ate);
 	if(!file.is_open()) {
 		return "Error: Unable to open file";

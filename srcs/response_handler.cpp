@@ -99,7 +99,7 @@ std::string ConfigHandler::callPythonCgi(char * const args[], char * const envp[
 
 		// create response if not find attachment
 		size_t pos = output.find("attachment");
-		if (pos == std::string::npos) 
+		if (pos == std::string::npos)
 		{
 			// get code from response
 			std::string message;
@@ -269,21 +269,34 @@ bool	isDirectory(std::string path)
 	return false;
 }
 
+std::string joinPaths(const std::string& basePath, const std::string& commonPart, const std::string& relativePath) {
+    // Check if the relative path starts with the common part
+    if (relativePath.find(commonPart) == 0) {
+        return basePath + relativePath.substr(commonPart.length());
+    } else {
+        // If not, simply concatenate the base path and relative path
+        return basePath + relativePath;
+    }
+}
+
 int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpRequest request) const
 {
 	std::map<std::string, std::string> directives = mLoc->directives;
 	std::string fullPath;
 	std::string reqPath = request.requestPath;
+	std::string autoIndexFlag = directives["autoindex"];
 
 	// Check if its autoindex
-	if (reqPath == "/autoindex")
+	if (autoIndexFlag == "on")
 	{
-		std::string fullArgPath = directives["root"] + reqPath + request.argPath;
+		// std::string fullArgPath = directives["root"] + reqPath + request.argPath;
+		std::string fullArgPath = directives["root"] + request.argPath;
 
 		// if arg path, it's file. otherwise, directory
 		if (request.argPath.length() == 0 || isDirectory(fullArgPath))
 		{
-			fullPath = directives["root"] + reqPath + request.argPath;
+			// fullPath = directives["root"] + reqPath + request.argPath;
+			fullPath = directives["root"] + request.argPath;
 
 			std::string retPath = reqPath + request.argPath;
 
@@ -292,7 +305,8 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 		}
 		else
 		{
-			fullPath = directives["root"] + request.path;
+			// fullPath = directives["root"];
+			fullPath = joinPaths(directives["root"], reqPath, request.path);
 
 			// Check if file exist
 			if (!checkFileExist(fullPath)) {
@@ -454,7 +468,7 @@ int getResponseCode(std::string response, std::string &message)
 
 	// get message length
 	size_t endMessage = response.find("\r\n", end);
-		
+
 	message = response.substr(start + 5, endMessage - start - 5);
 
 	return std::atoi(code.c_str());

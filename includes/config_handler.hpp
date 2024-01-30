@@ -96,6 +96,7 @@ std::string		formatSize(size_t size);
 char * const	*createCgiEnvp( const std::map<std::string, std::string> &cgiEnv );
 std::string		readHtmlFile(const std::string &filePath);
 std::string 	createHtmlResponseOnlyHead(int statusCode);
+std::string		joinPaths(const std::string& basePath, const std::string& commonPart, const std::string& relativePath);
 
 
 class ConfigHandler
@@ -124,7 +125,7 @@ class ConfigHandler
 
 	public:
 		std::string _cwd;
-		
+
 		ConfigHandler();
 		ConfigHandler( std::string );
 		~ConfigHandler();

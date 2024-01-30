@@ -14,9 +14,12 @@ CURSIVE		=	\e[33;3m
 
 SRC_DIR = srcs/
 OBJ_DIR = objs/
+INCS_DIR = includes/
+
 OBJS = $(SRCS:.cpp=.o)
 
 INCS = -Iincludes/
+HEADERS = $(wildcard $(INCS_DIR)*.hpp)
 
 SRCS = config_handler.cpp \
 	utility.cpp \
@@ -33,7 +36,7 @@ $(NAME): $(addprefix $(OBJ_DIR),$(OBJS))
 	@$(CC) $(CFLAGS) $(addprefix $(OBJ_DIR),$(OBJS)) -o $(NAME)
 	@printf "$(GREEN)    - $(NAME) Executable ready.\n$(RESET)"
 
-$(OBJ_DIR)%.o: $(SRC_DIR)%.cpp
+$(OBJ_DIR)%.o: $(SRC_DIR)%.cpp $(HEADERS)
 	@mkdir -p $(OBJ_DIR)
 	@$(CC) $(CFLAGS) -c $< $(INCS) -o $@
 

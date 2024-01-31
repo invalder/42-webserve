@@ -3,7 +3,6 @@
 // prototype of helper funciton
 static bool							checkMethod(Location const *, t_HttpRequest);
 static bool 						checkRedirect(Location const *, std::string &);
-// int									execute(Location const *, std::string &, t_HttpRequest);
 std::map<std::string, std::string>	createCgiEnvp(std::string, std::string, t_HttpRequest);
 int									getResponseCode(std::string, std::string &);
 
@@ -52,24 +51,12 @@ std::string ConfigHandler::callPythonCgi(char * const args[], char * const envp[
 		// dup2(pipeCgi[0], STDIN_FILENO);
 		close(pipeCgi[1]);
 
-		switch (status)
-		{
-			case 1:
-				return createHtmlResponse(404, getHttpStatusString(404));
-			case 2:
-				return createHtmlResponse(405, "Method Not Allowed");
-			case 3:
-				return createHtmlResponse(404, getHttpStatusString(404));
-			case 4:
-				return createHtmlResponse(403, "Forbidden");
-			default:
-				break ;
-		}
-
+		int	convertStat = 0;
 		// Check the exit status of the child process
 		if (WIFEXITED(status))
 		{
-			// std::cerr << DEBUG_MSG << "Child process exited with status " << WEXITSTATUS(status) << std::endl;
+			std::cerr << DEBUG_MSG << "Child process exited with status " << WEXITSTATUS(status) << std::endl;
+			convertStat = WEXITSTATUS(status);
 		}
 		else if (WIFSIGNALED(status))
 		{
@@ -83,6 +70,19 @@ std::string ConfigHandler::callPythonCgi(char * const args[], char * const envp[
 			std::cerr << DEBUG_MSG << "Child process was stopped by signal " << WSTOPSIG(status) << std::endl;
 		}
 
+		switch (convertStat)
+		{
+			case 1:
+				return createHtmlResponse(404, getHttpStatusString(404));
+			case 2:
+				return createHtmlResponse(405, "Method Not Allowed");
+			case 3:
+				return createHtmlResponse(404, getHttpStatusString(404));
+			case 4:
+				return createHtmlResponse(403, "Forbidden");
+			default:
+				break ;
+		}
 		// Read from the pipe
 		char buffer[4096];
 		std::string output;
@@ -134,12 +134,24 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 	if (request.argPath == request.requestPath)
 		request.argPath = "";
 
-	// locahost/index/454
+std::map<std::string, std::string>	findRoot = _httpConfig.directives;
+	std::string	currentRoot = "";
+
+	if (findRoot["root"].length() != 0)
+		currentRoot = _cwd + findRoot["root"];
+
+	findRoot = matchedServer->directives;
+	if (findRoot["root"].length() != 0)
+		currentRoot = findRoot["root"];
 
 	const Location *matchedLocation = matchRequestToLocation(request.requestPath, matchedServer);
 
 	if (matchedLocation)
 	{
+		findRoot = matchedLocation->directives;
+		if (findRoot["root"].length() != 0)
+			currentRoot = findRoot["root"];
+		
 		// cx method
 		if (checkMethod(matchedLocation, request) || request.method == "HEAD")
 		{
@@ -172,18 +184,29 @@ int	ConfigHandler::checkLocation(std::string &response, t_HttpRequest request, S
 
 		if (matchedDefaultFile == rootDefaultFile)
 		{
-			return this->execute(const_cast<Location *>(&rootLocation), response, request);
+			return this->execute(const_cast<Location *>(&rootLocation), response, request, currentRoot);
 		}
 		// matchLocation = root if they share the same default file
 		// or go to cgi or html file
-		return this->execute(matchedLocation, response, request);
+		return this->execute(matchedLocation, response, request, currentRoot);
 
 	}
 	else
 	{
 		// check if request path is image
 		if (checkImageFile(request.path)) {
-			std::string		imgPath = _cwd + "/htdocs/image" + request.path;
+			std::string		imgPath = _cwd; // + root + "/image" + request.path;
+			std::map<std::string, std::string>	tmp = _httpConfig.directives;
+			
+			if (tmp["root"].length() != 0)
+				imgPath = _cwd + tmp["root"];
+
+ 			tmp = matchedServer->directives;
+			if (tmp["root"].length() != 0)
+				imgPath = tmp["root"];
+
+			imgPath = imgPath + "/image" + request.path;
+
 			if (checkFileExist(imgPath))
 				response = createFileResponse(200, imgPath);
 			else
@@ -279,7 +302,7 @@ std::string joinPaths(const std::string& basePath, const std::string& commonPart
     }
 }
 
-int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpRequest request) const
+int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpRequest request, std::string &rootPath) const
 {
 	std::map<std::string, std::string> directives = mLoc->directives;
 	std::string fullPath;
@@ -322,7 +345,8 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 	// if request has no path argument, get default file and return
 	if (request.argPath.length() == 0)
 	{
-		fullPath = directives["root"] + "/" + directives["default_file"];
+		// fullPath = directives["root"] + "/" + directives["default_file"];
+		fullPath = rootPath + "/" + directives["default_file"];
 
 		if (!checkFileExist(fullPath)) {
 			response = createHtmlResponse(404, getHttpStatusString(404));
@@ -343,15 +367,15 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 		std::string	cgiPath = "";
 
 		if (request.requestPath != "/cgi-bin")
-			cgiPath = directives["root"] + "/cgi-bin" + request.requestPath + cgiMap["extension"];
+			cgiPath = rootPath + "/cgi-bin" + request.requestPath + cgiMap["extension"];
 		else
-			cgiPath = directives["root"] + request.requestPath + "/" + request.argPath;
+			cgiPath = rootPath + request.requestPath + request.argPath + cgiMap["extension"];
 
 		std::string	execPath = cgiMap["executable"];
-		std::string	absFilePath = directives["root"] + "/upload/" + request.argPath;
+		std::string	absFilePath = rootPath + "/upload/" + request.argPath;
 
 		// create envp
-		std::map<std::string, std::string>	cgiEnvpMap = createCgiEnvp(directives["root"], absFilePath, request);
+		std::map<std::string, std::string>	cgiEnvpMap = createCgiEnvp(rootPath, absFilePath, request);
 		// to exec cgi
 
 		char * const *cgiEnvp = createCgiEnvp(cgiEnvpMap);
@@ -363,8 +387,9 @@ int		ConfigHandler::execute(Location const *mLoc, std::string &response, t_HttpR
 			response = callPythonCgi(args, cgiEnvp);
 
 			std::string message;
-			int code = getResponseCode(response, message);
-			return code;
+			// int code = getResponseCode(response, message);
+			return 0;
+			// return code;
 		}
 		catch (std::exception &e) {
 			std::cerr << BRED << "Error: " << e.what() << RESET << std::endl;

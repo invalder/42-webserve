@@ -174,6 +174,8 @@ std::string getHttpStatusString(int statusCode)
 		return "Not Found";
 	case 405:
 		return "Method Not Allowed";
+	case 408:
+		return "Request Timeout";
 	case 500:
 		return "Internal Server Error";
 	case 501:

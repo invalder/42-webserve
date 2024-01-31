@@ -147,7 +147,7 @@ class ConfigHandler
 		std::string		createFileResponse(int statusCode, const std::string &filePath) const;
 
 		void	run() const;
-		int		execute(Location const *mLoc, std::string &response, t_HttpRequest request) const;
+		int		execute(Location const *mLoc, std::string &response, t_HttpRequest request, std::string &rootPath) const;
 
 		std::string		callPythonCgi(char * const args[], char * const envp[], unsigned int timeout) const;
 

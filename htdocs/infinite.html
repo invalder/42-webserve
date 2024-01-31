@@ -22,7 +22,7 @@
 		infinite.addEventListener("click", async (e) => {
 			e.preventDefault(); // not refresh page
 
-			await fetch(`http://${local_host}/infinite/`, { 
+			await fetch(`http://${local_host}/cgi-bin/infinite`, { 
 				method: 'GET',
 			}).then(
 				(response) => { console.log('GET status:', response.status) },
